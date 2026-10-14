@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <defs>
+    <!-- Dynamic Play Triangle Gradient: Golden Amber to Deep Sunset Orange -->
+    <linearGradient id="iconTriangleGrad" x1="240" y1="58" x2="435" y2="235" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="40%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+
+    <!-- Filmstrip Gradient: Warm Champagne Gold (Sıcak Sinematik Ton, Soğuk Beyaz Yok) -->
+    <linearGradient id="iconFilmGrad" x1="80" y1="58" x2="320" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fef3c7" />
+      <stop offset="45%" stop-color="#fde68a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Ambient Glow -->
+    <radialGradient id="iconBgGlow" cx="55%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Squircle Base for App Icon & Badges -->
+  <rect width="512" height="512" rx="124" fill="#0c0d12" stroke="#27272a" stroke-width="12" />
+  <rect width="512" height="512" rx="124" fill="url(#iconBgGlow)" />
+
+  <!-- Centered Logo Geometry Scaled to 512x512 -->
+  <g transform="translate(-2, 35) scale(5.12)">
+    <!-- Filmstrip with Perforations -->
+    <path
+      fill="url(#iconFilmGrad)"
+      fill-rule="evenodd"
+      d="M15.7,11.5h25.7l21.8,39.6-12.8,23.7L15.7,11.5ZM20.1,15l3.2-2.2,1,1.9-3.2,2.2-1-1.9ZM54.4,47.7l3.2-2.2,1,1.9-3.2,2.2-1-1.9ZM50.2,39.9l3.1-2.2,1,1.9-3.2,2.2-1-1.9ZM46,32.1l3.1-2.2,1,2-3.2,2.2-1-2ZM41.7,24.3l3.2-2.2,1,2-3.2,2.2-1-2ZM37.5,16.5l3.2-2.2,1,1.9-3.2,2.2-1-1.9ZM45.5,61.8l3.2-2.2,1,2-3.1,2.2-1-2ZM41.3,54l3.2-2.2,1,2-3.1,2.2-1-2ZM37.1,46.2l3.2-2.2,1,1.9-3.2,2.2-1-1.9ZM32.8,38.4l3.2-2.2,1,1.9-3.2,2.2-1-1.9ZM28.6,30.6l3.2-2.2,1,2-3.2,2.2-1-2ZM24.4,22.8l3.2-2.2,1,2-3.2,2.2-1-2Z"
+    />
+
+    <!-- Dynamic Play Wedge -->
+    <polygon
+      fill="url(#iconTriangleGrad)"
+      points="47.6 11.5 85.1 11.5 66.3 45.8 47.6 11.5"
+    />
+  </g>
+</svg>
