@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const trimmed = enteredPin.trim();
 
     // 1. Doğrudan Demo PIN kontrolü
-    if (trimmed === '110795') {
+    if (trimmed === '123456') {
       loginAsGuest();
       return true;
     }

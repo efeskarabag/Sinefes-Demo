@@ -58,7 +58,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
       if (onClose) onClose();
     } else {
       setIsShaking(true);
-      setErrorMessage('Geçersiz Güvenlik PIN Kodu! (Demo için "110795" kullanabilirsiniz)');
+      setErrorMessage('Geçersiz Güvenlik PIN Kodu! (Demo için "123456" kullanabilirsiniz)');
       setTimeout(() => {
         setIsShaking(false);
         setPin('');
@@ -162,7 +162,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
               <div className="w-full border-t border-zinc-800" />
             </div>
             <span className="relative bg-[#0e0e11] px-3 text-[11px] font-medium text-zinc-500">
-              veya PIN ile girin (Varsayılan: 110795)
+              veya PIN ile girin (Varsayılan: 123456)
             </span>
           </div>
 

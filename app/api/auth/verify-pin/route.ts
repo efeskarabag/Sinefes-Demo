@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
 
     const trimmedPin = pin.trim();
-    const serverPin = (process.env.APP_PIN || '110795').trim();
+    const serverPin = (process.env.APP_PIN || '123456').trim();
 
     if (trimmedPin === serverPin) {
       return NextResponse.json({
