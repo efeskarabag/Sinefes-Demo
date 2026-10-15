@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
 import {
   X,
   Star,
@@ -14,15 +14,89 @@ import {
   Clock,
   Layers,
   ExternalLink,
+  Flame,
   Search,
   Loader2,
   PlayCircle,
+  Plus,
+  CheckCircle2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MediaItem, MediaStatus, CustomRating, WatchProvider } from '@/lib/types';
 import { ABSURD_RATINGS, STATUS_CONFIG } from '@/lib/constants';
 import { useAuth } from '@/lib/authContext';
-import { StatusIcon, RatingIcon } from '@/components/media/MediaIcons';
+import { StatusIcon, RatingIcon, SeriesIcon } from '@/components/media/MediaIcons';
+import { getFranchiseForMovie } from '@/lib/collections';
+
+// Platform doğrudan uygulama (Universal Link) veya resmi web arama URL'i üretici
+export const getPlatformUrl = (platformName: string, title: string): string => {
+  const p = platformName.toLowerCase();
+  const q = encodeURIComponent(title);
+
+  if (p.includes('netflix')) {
+    return `https://www.netflix.com/search?q=${q}`;
+  }
+  if (p.includes('disney')) {
+    return `https://www.disneyplus.com/search?q=${q}`;
+  }
+  if (p.includes('prime') || p.includes('amazon')) {
+    return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
+  }
+  if (p.includes('apple') || p.includes('tv+')) {
+    if (p.includes('apple')) {
+      return `https://tv.apple.com/search?term=${q}`;
+    }
+    // Turkcell TV+
+    return `https://tvplus.com.tr/arama?q=${q}`;
+  }
+  if (p.includes('blu')) {
+    return `https://www.blutv.com/arama?q=${q}`;
+  }
+  if (p.includes('gain') || p.includes('gaın')) {
+    return `https://www.gain.tv/arama?q=${q}`;
+  }
+  if (p.includes('exxen')) {
+    return `https://www.exxen.com/tr/arama?q=${q}`;
+  }
+  if (p.includes('max') || p.includes('hbo')) {
+    return `https://www.max.com/search?q=${q}`;
+  }
+  if (p.includes('tod') || p.includes('bein')) {
+    return `https://www.todtv.com.tr/arama?q=${q}`;
+  }
+  if (p.includes('mubi')) {
+    return `https://mubi.com/tr/search/films?query=${q}`;
+  }
+  if (p.includes('dsmart') || p.includes('d-smart')) {
+    return `https://www.dsmartgo.com.tr/arama?q=${q}`;
+  }
+  if (p.includes('tivibu')) {
+    return `https://www.tivibu.com.tr/arama?q=${q}`;
+  }
+  if (p.includes('hdfilm')) {
+    return `https://www.google.com/search?q=${encodeURIComponent(`hdfilmcehennemi ${title}`)}`;
+  }
+
+  return `https://www.google.com/search?q=${encodeURIComponent(`${platformName} ${title}`)}`;
+};
+
+interface SeriesPartItem {
+  id: number;
+  title: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date: string | null;
+  release_year: string;
+  vote_average: number;
+  overview: string;
+}
+
+interface SeriesData {
+  id: number;
+  name: string;
+  overview?: string | null;
+  parts: SeriesPartItem[];
+}
 
 interface MediaDetailBottomSheetProps {
   item: MediaItem | null;
@@ -30,6 +104,8 @@ interface MediaDetailBottomSheetProps {
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<MediaItem>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  archiveItems: MediaItem[];
+  onAddMultiple: (items: Array<Omit<MediaItem, 'id' | 'created_at'>>, seriesName: string) => Promise<void>;
 }
 
 export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
@@ -38,6 +114,8 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
   onClose,
   onUpdate,
   onDelete,
+  archiveItems,
+  onAddMultiple,
 }) => {
   const { isAuthenticated, openGate } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState<MediaStatus>(item?.status ?? 'watchlist');
@@ -58,6 +136,36 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
   } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(true);
 
+  // Seri / Franchise Bilgileri ve Toplu Ekleme
+  const [seriesInfo, setSeriesInfo] = useState<SeriesData | null>(null);
+  const [isLoadingSeries, setIsLoadingSeries] = useState<boolean>(false);
+  const [isAddingSeries, setIsAddingSeries] = useState<boolean>(false);
+
+  // Bilinen franchise veya TMDB serisi varsa çek
+  useEffect(() => {
+    if (!isOpen || !item || item.media_type !== 'movie') {
+      setSeriesInfo(null);
+      return;
+    }
+
+    let isMounted = true;
+    const franchise = getFranchiseForMovie(item);
+
+    if (franchise) {
+      setIsLoadingSeries(true);
+      fetch(`/api/tmdb/collection?franchiseId=${franchise.id}`)
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (!isMounted || !data) return;
+          setSeriesInfo(data);
+        })
+        .catch(err => console.warn('Failed to fetch franchise info:', err))
+        .finally(() => {
+          if (isMounted) setIsLoadingSeries(false);
+        });
+    }
+  }, [isOpen, item?.id, item?.media_type]);
+
   useEffect(() => {
     if (!item?.tmdb_id) return;
     let isMounted = true;
@@ -68,6 +176,21 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       .then(data => {
         if (!isMounted || !data) return;
         setWatchProviders(data.watch_providers || null);
+
+        // Eğer bilinen bir franchise değilse ama TMDB koleksiyonu varsa
+        if (!getFranchiseForMovie(item) && data.belongs_to_collection?.id) {
+          setIsLoadingSeries(true);
+          fetch(`/api/tmdb/collection?id=${data.belongs_to_collection.id}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then(sData => {
+              if (!isMounted || !sData) return;
+              setSeriesInfo(sData);
+            })
+            .catch(err => console.warn('Failed to fetch collection info:', err))
+            .finally(() => {
+              if (isMounted) setIsLoadingSeries(false);
+            });
+        }
 
         // Dizi ise ve kayıtlı sezon sayısı hatalı/eksikse otomatik düzelt
         if (
@@ -96,6 +219,51 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       isMounted = false;
     };
   }, [item?.id, item?.tmdb_id, item?.media_type, item?.total_seasons, item?.duration, onUpdate]);
+
+  // Arşivdeki mevcut filmler ile serideki eksikleri hesapla
+  const archiveTmdbIds = useMemo(
+    () => new Set((archiveItems || []).map(i => i.tmdb_id)),
+    [archiveItems]
+  );
+
+  const { inArchiveParts, missingParts } = useMemo(() => {
+    if (!seriesInfo?.parts) return { inArchiveParts: [], missingParts: [] };
+    const inArchive = seriesInfo.parts.filter(p => archiveTmdbIds.has(p.id));
+    const missing = seriesInfo.parts.filter(p => !archiveTmdbIds.has(p.id));
+    return { inArchiveParts: inArchive, missingParts: missing };
+  }, [seriesInfo, archiveTmdbIds]);
+
+  const handleBatchAddSeries = async () => {
+    if (!isAuthenticated) {
+      openGate();
+      return;
+    }
+    if (missingParts.length === 0) return;
+    setIsAddingSeries(true);
+    try {
+      const itemsToAdd = missingParts.map(p => ({
+        tmdb_id: p.id,
+        title: p.title,
+        media_type: 'movie' as const,
+        poster_path: p.poster_path,
+        backdrop_path: p.backdrop_path,
+        release_year: p.release_year || '',
+        imdb_rating: p.vote_average || 0,
+        status: 'watchlist' as const,
+        custom_rating: null,
+        personal_note: null,
+        overview: p.overview || null,
+        genres: item?.genres || null,
+        duration: null,
+        total_seasons: null,
+      }));
+      await onAddMultiple(itemsToAdd, seriesInfo?.name || 'Seri');
+    } catch (err) {
+      console.error('Failed to add series items:', err);
+    } finally {
+      setIsAddingSeries(false);
+    }
+  };
 
   // Arka plan kaymasını engelle (Body scroll lock) ve Escape ile kapatma
   useEffect(() => {
@@ -198,7 +366,95 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     onClose();
   };
 
+  // Türkçe karakter uyumlu karakter sayısı hesabı
   const remainingChars = Math.max(0, 200 - Array.from(personalNote).length);
+
+  // Thumb Swipe-to-Dismiss (Soldan sağa baş parmakla çekerek kapatma)
+  const x = useMotionValue(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const isSwipingRight = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      x.set(0);
+    }
+  }, [isOpen, item?.id, x]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+    isSwipingRight.current = null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+
+    // İlk belirgin harekette kullanıcının niyeti tespit edilir (sağa çekme mi, dikey kaydırma mı)
+    if (isSwipingRight.current === null) {
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (absX > 8 || absY > 8) {
+        if (deltaX > 0 && deltaX > absY * 1.1) {
+          isSwipingRight.current = true;
+        } else {
+          isSwipingRight.current = false;
+        }
+      }
+    }
+
+    if (isSwipingRight.current === true) {
+      // Sadece sağa kaydırmaya izin ver
+      const clampedX = Math.max(0, deltaX);
+      x.set(clampedX);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+
+    if (isSwipingRight.current === true) {
+      const finalDeltaX = e.changedTouches[0].clientX - touchStartX.current;
+      const elapsed = Math.max(1, Date.now() - touchStartTime.current);
+      const velocity = finalDeltaX / elapsed; // px/ms
+      const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
+      const distanceThreshold = Math.min(100, screenWidth * 0.25);
+
+      // Eşik mesafe (100px) veya hızlı baş parmak hareketi (flick)
+      if (finalDeltaX > distanceThreshold || (finalDeltaX > 40 && velocity > 0.4)) {
+        animate(x, screenWidth, {
+          duration: 0.22,
+          ease: [0.32, 0.72, 0, 1],
+        }).then(() => {
+          onClose();
+          setTimeout(() => x.set(0), 100);
+        });
+      } else {
+        // Yeterince çekilmediyse yay efektiyle yerine geri otursun
+        animate(x, 0, {
+          type: 'spring',
+          damping: 26,
+          stiffness: 350,
+        });
+      }
+    }
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+    isSwipingRight.current = null;
+  };
 
   return (
     <AnimatePresence>
@@ -221,10 +477,14 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+          style={{ x }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           onClick={e => e.stopPropagation()}
-          className="relative max-h-[92vh] md:max-h-[88vh] w-full max-w-lg md:max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800/80 bg-zinc-950 pb-28 md:pb-8 pt-3 text-zinc-100 shadow-2xl scrollbar-none z-10 md:my-auto cursor-default select-text"
+          className="relative max-h-[92vh] md:max-h-[88vh] w-full max-w-lg md:max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800/80 bg-zinc-950 pb-28 md:pb-8 pt-3 text-zinc-100 shadow-2xl scrollbar-none z-10 md:my-auto cursor-default select-text touch-pan-y"
         >
-          {/* Mobile Grab Handle */}
+          {/* Mobile Grab Handle (Tıklanabilir Kapatma) */}
           <div
             onClick={onClose}
             className="mx-auto h-1.5 w-12 rounded-full bg-zinc-800 mb-2 md:hidden cursor-pointer hover:bg-zinc-700 active:bg-zinc-600 transition"
@@ -342,7 +602,75 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               </p>
             )}
 
-            {/* Nerede İzlenir? (Platformlar) */}
+            {/* Seri / Franchise Bilgi ve Toplu Ekleme Kartı */}
+            {seriesInfo && seriesInfo.parts.length > 1 && (
+              <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-zinc-900/60 to-zinc-900/40 p-4 space-y-3 shadow-md shadow-amber-500/5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                      <SeriesIcon size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-zinc-100 truncate">
+                        {seriesInfo.name}
+                      </h4>
+                      <p className="text-[11px] text-zinc-400">
+                        {inArchiveParts.length} / {seriesInfo.parts.length} Film Arşivinde
+                      </p>
+                    </div>
+                  </div>
+
+                  {missingParts.length === 0 ? (
+                    <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
+                      <CheckCircle2 size={12} strokeWidth={2.5} />
+                      <span>Tüm Seri Arşivinde</span>
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* İlerleme Çubuğu */}
+                <div className="space-y-1">
+                  <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden border border-zinc-700/50">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        missingParts.length === 0
+                          ? 'bg-emerald-500'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-300'
+                      }`}
+                      style={{
+                        width: `${Math.max(
+                          6,
+                          Math.round((inArchiveParts.length / seriesInfo.parts.length) * 100)
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Aksiyon Butonu */}
+                {missingParts.length > 0 && (
+                  <button
+                    onClick={handleBatchAddSeries}
+                    disabled={isAddingSeries}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-zinc-950 py-2.5 px-3 text-xs font-bold transition shadow-md shadow-amber-500/20 disabled:opacity-50"
+                  >
+                    {isAddingSeries ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin text-zinc-950" />
+                        <span>Seri Ekleniyor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} strokeWidth={2.5} />
+                        <span>Tüm Seriyi Listeme Ekle (Eksik {missingParts.length} Film)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Nerede İzlenir? (Platformlar & HDFilmcehennemi) */}
             <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
@@ -381,6 +709,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {/* Tüm Platformlar (Netflix, Disney+, Prime, BluTV & HDFilmcehennemi) */}
                   {(() => {
                     const official = [
                       ...(watchProviders?.flatrate || []),
@@ -390,20 +719,16 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                       new Map(official.map(p => [p.provider_id, p])).values()
                     );
 
-                    const getPlatformSearchUrl = (name: string) => {
-                      return `https://www.google.com/search?q=${encodeURIComponent(`${name} ${item.title}`)}`;
-                    };
-
                     return (
                       <div className="flex flex-wrap items-center gap-2">
                         {unique.map(p => (
                           <a
                             key={p.provider_id}
-                            href={getPlatformSearchUrl(p.provider_name)}
+                            href={getPlatformUrl(p.provider_name, item.title)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:scale-95 group"
-                            title={`${p.provider_name}'de ara / izle`}
+                            title={`${p.provider_name}'de aç`}
                           >
                             {p.logo_path ? (
                               <Image
@@ -425,9 +750,9 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                           </a>
                         ))}
 
-                        {/* HDFilmcehennemi Kartı */}
+                        {/* HDFilmcehennemi — Standart Eşit Bir Platform Kartı Olarak */}
                         <a
-                          href={getPlatformSearchUrl('hdfilmcehennemi')}
+                          href={getPlatformUrl('hdfilmcehennemi', item.title)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:scale-95 group"
@@ -448,7 +773,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               )}
             </div>
 
-            {/* Durum Yönetimi */}
+            {/* Durum Yönetimi (Filmlerde sezon seçeneği gizlenir) */}
             <div>
               <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                 Durum
@@ -485,7 +810,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               </div>
             </div>
 
-            {/* Puanlama Sistemi */}
+            {/* Puanlama Sistemi (Sade Başlık) */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
@@ -532,7 +857,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               </div>
             </div>
 
-            {/* Kişisel Not */}
+            {/* Kişisel Not (Canlı Karakter Sayaçlı) */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">

@@ -88,3 +88,27 @@ export const MediaTypeIcon: React.FC<MediaTypeIconProps> = ({
     <Tv size={size} strokeWidth={strokeWidth} className={className} />
   );
 };
+
+// Sinematik Seri / Koleksiyon Destesi İkonu (2 üst üste binen film posteri + oynat işareti)
+export const SeriesIcon: React.FC<{
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}> = ({ size = 14, className = '', strokeWidth = 1.75 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <rect x="7" y="2.5" width="13" height="16" rx="2" opacity="0.45" />
+    <rect x="3.5" y="5.5" width="13" height="16" rx="2" />
+    <path d="M8.5 11.5l3.5 2-3.5 2v-4z" fill="currentColor" stroke="none" />
+  </svg>
+);
+

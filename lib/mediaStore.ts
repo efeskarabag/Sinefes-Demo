@@ -1,11 +1,11 @@
 import { INITIAL_DEMO_ITEMS } from './constants';
 import { MediaItem } from './types';
 
-const STORAGE_KEY = 'sinefes_demo_media_items_v2';
+const STORAGE_KEY = 'sinefes_demo_media_items_v3';
 
 /**
  * Oturuma özel medya listesini getirir.
- * İlk defa açıldığında 15 Film + 15 Dizi ile sessionStorage'ı başlatır.
+ * İlk defa açıldığında başlangıç havuzu ile sessionStorage'ı başlatır.
  */
 export async function getMediaItems(): Promise<MediaItem[]> {
   if (typeof window !== 'undefined') {
@@ -14,7 +14,7 @@ export async function getMediaItems(): Promise<MediaItem[]> {
       if (sessionData) {
         return JSON.parse(sessionData) as MediaItem[];
       }
-      // İlk ziyaretçi oturumu: 30'luk zengin havuzla başlat
+      // İlk ziyaretçi oturumu: zengin havuzla başlat
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_DEMO_ITEMS));
       return INITIAL_DEMO_ITEMS;
     } catch (e) {
@@ -47,6 +47,35 @@ export async function saveMediaItem(item: Omit<MediaItem, 'id' | 'created_at'>):
   }
 
   return newItem;
+}
+
+/**
+ * Oturum hafızasına birden fazla yapımı topluca ekler (Örn: Bir film serisinin eksik filmleri).
+ */
+export async function saveMultipleMediaItems(
+  items: Array<Omit<MediaItem, 'id' | 'created_at'>>
+): Promise<MediaItem[]> {
+  const newItems: MediaItem[] = items.map((item, index) => ({
+    ...item,
+    id: typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `item-${Date.now()}-${index}`,
+    created_at: new Date().toISOString(),
+  }));
+
+  if (typeof window !== 'undefined') {
+    try {
+      const existing = await getMediaItems();
+      const newTmdbIds = new Set(newItems.map(i => i.tmdb_id));
+      const filteredExisting = existing.filter(i => !newTmdbIds.has(i.tmdb_id));
+      const updated = [...newItems, ...filteredExisting];
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('sessionStorage toplu kaydetme hatası:', e);
+    }
+  }
+
+  return newItems;
 }
 
 /**
@@ -88,7 +117,7 @@ export async function deleteMediaItem(id: string): Promise<boolean> {
 }
 
 /**
- * Demo verilerini başlangıçtaki 30 yapıma sıfırlar.
+ * Demo verilerini başlangıç havuzuna sıfırlar.
  */
 export async function resetDemoData(): Promise<MediaItem[]> {
   if (typeof window !== 'undefined') {

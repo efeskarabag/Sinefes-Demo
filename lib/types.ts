@@ -18,7 +18,7 @@ export type SortOption =
 export interface WatchProvider {
   provider_id: number;
   provider_name: string;
-  logo_path: string | null;
+  logo_path: string;
 }
 
 export interface MediaItem {
@@ -59,3 +59,23 @@ export interface TMDBMediaResult {
   original_name?: string;
   popularity?: number;
 }
+
+export interface CollectionGroup {
+  id: string;
+  tmdb_collection_id?: number | null;
+  name: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  overview?: string | null;
+  items: MediaItem[];
+  total_count: number;
+  watched_count: number;
+  watchlist_count: number;
+  completion_percentage: number;
+  average_rating: number;
+  latest_release_year: string;
+}
+
+export type FeedItem =
+  | { type: 'single'; item: MediaItem }
+  | { type: 'collection'; collection: CollectionGroup };

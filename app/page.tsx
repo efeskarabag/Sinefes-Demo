@@ -15,24 +15,29 @@ import {
   Layers,
   Check,
 } from 'lucide-react';
-import { MediaItem, MediaStatus, MediaType, SortOption } from '@/lib/types';
+import { CollectionGroup, FeedItem, MediaItem, MediaStatus, MediaType, SortOption } from '@/lib/types';
 import { STATUS_CONFIG, SORT_OPTIONS } from '@/lib/constants';
 import {
   getMediaItems,
   saveMediaItem,
+  saveMultipleMediaItems,
   updateMediaItem,
   deleteMediaItem,
   resetDemoData,
 } from '@/lib/mediaStore';
+import confetti from 'canvas-confetti';
 import { useAuth } from '@/lib/authContext';
 import { PosterCard } from '@/components/media/PosterCard';
+import { CollectionStackCard } from '@/components/media/CollectionStackCard';
 import { MediaDetailBottomSheet } from '@/components/media/MediaDetailBottomSheet';
+import { CollectionDetailSheet } from '@/components/media/CollectionDetailSheet';
 import { SearchSheet } from '@/components/search/SearchSheet';
 import { SecurityGateModal } from '@/components/gate/SecurityGateModal';
 import { BottomNav, NavTab } from '@/components/navigation/BottomNav';
-import { StatusIcon } from '@/components/media/MediaIcons';
+import { StatusIcon, SeriesIcon } from '@/components/media/MediaIcons';
 import { SinefesLogo } from '@/components/common/SinefesLogo';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { groupMediaItemsIntoFeed } from '@/lib/collections';
 
 export default function Home() {
   const { isAuthenticated, isLoading: isAuthLoading, lockSession, openGate } = useAuth();
@@ -50,10 +55,13 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [localSearch, setLocalSearch] = useState<string>('');
   const [isLocalSearchActive, setIsLocalSearchActive] = useState<boolean>(false);
+  const [groupBySeries, setGroupBySeries] = useState<boolean>(true);
 
   // Modals & Sheets
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<CollectionGroup | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [isCollectionSheetOpen, setIsCollectionSheetOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
   // Toast feedback message
@@ -66,7 +74,7 @@ export default function Home() {
     }, 3000);
   }, []);
 
-  // Sıralama modalı açıkken arka plan kaymasını engelle
+  // Sıralama veya ayar modalı açıkken arka plan kaymasını engelle
   useEffect(() => {
     if (!isSortModalOpen && !isSettingsOpen) return;
     const originalOverflow = document.body.style.overflow;
@@ -84,12 +92,16 @@ export default function Home() {
     };
   }, [isSortModalOpen, isSettingsOpen]);
 
-  // Sıralama tercihini oturum hafızasından yükle
+  // Sıralama ve seri gruplama tercihini oturum hafızasından yükle
   useEffect(() => {
     try {
       const savedSort = sessionStorage.getItem('sinefes_demo_sort_option') as SortOption | null;
       if (savedSort && SORT_OPTIONS.some(o => o.id === savedSort)) {
         setSortOption(savedSort);
+      }
+      const savedGroupBySeries = sessionStorage.getItem('sinefes_demo_group_by_series');
+      if (savedGroupBySeries !== null) {
+        setGroupBySeries(savedGroupBySeries === 'true');
       }
     } catch {}
   }, []);
@@ -267,10 +279,23 @@ export default function Home() {
     return new Set(items.map(i => i.tmdb_id));
   }, [items]);
 
+  // Akıllı Seri Yığınları (Collection Stacks)
+  const feedItems = useMemo(() => {
+    return groupMediaItemsIntoFeed(
+      filteredAndSortedItems,
+      activeTab === 'movies' && groupBySeries
+    );
+  }, [filteredAndSortedItems, activeTab, groupBySeries]);
+
   // Handlers
   const handleOpenDetail = (item: MediaItem) => {
     setSelectedItem(item);
     setIsDetailOpen(true);
+  };
+
+  const handleOpenCollection = (collection: CollectionGroup) => {
+    setSelectedCollection(collection);
+    setIsCollectionSheetOpen(true);
   };
 
   const handleUpdateItem = async (id: string, updates: Partial<MediaItem>) => {
@@ -304,10 +329,35 @@ export default function Home() {
     showToast(`"${created.title}" arşive eklendi.`);
   };
 
+  const handleBatchAddItems = async (
+    newItemsData: Array<Omit<MediaItem, 'id' | 'created_at'>>,
+    seriesName?: string
+  ) => {
+    if (newItemsData.length === 0) return;
+    const createdItems = await saveMultipleMediaItems(newItemsData);
+    if (createdItems.length > 0) {
+      const newTmdbIds = new Set(createdItems.map(i => i.tmdb_id));
+      setItems(prev => [...createdItems, ...prev.filter(i => !newTmdbIds.has(i.tmdb_id))]);
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#f59e0b', '#fbbf24', '#ffffff', '#10b981'],
+        });
+      } catch {}
+      showToast(
+        seriesName
+          ? `"${seriesName}" serisinden ${createdItems.length} film izleme listene eklendi!`
+          : `${createdItems.length} film izleme listene eklendi!`
+      );
+    }
+  };
+
   const handleResetData = async () => {
     const fresh = await resetDemoData();
     setItems(fresh);
-    showToast('Demo başlangıç verileri (30 yapım) geri yüklendi.');
+    showToast('Demo başlangıç verileri geri yüklendi.');
   };
 
   // Sekmeye göre durumlar (Filmlerde sezon yok)
@@ -634,21 +684,47 @@ export default function Home() {
             </div>
           )}
 
-          {/* Sağ: Sıralama Butonu */}
-          <button
-            type="button"
-            onClick={() => setIsSortModalOpen(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/90 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 hover:border-amber-500/50 hover:text-amber-400 transition-colors shadow-sm"
-          >
-            <ArrowUpDown size={12} strokeWidth={1.5} className="text-amber-400" />
-            <span className="hidden sm:inline">
-              {SORT_OPTIONS.find(o => o.id === sortOption)?.label.split('(')[0].trim() || 'Sırala'}
-            </span>
-            <span className="sm:hidden">Sırala</span>
-          </button>
+          {/* Sağ: Seri Gruplama & Sıralama Butonları */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {activeTab === 'movies' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGroupBySeries(prev => {
+                    const next = !prev;
+                    try {
+                      sessionStorage.setItem('sinefes_demo_group_by_series', String(next));
+                    } catch {}
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition active:scale-95 shadow-sm ${
+                  groupBySeries
+                    ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-amber-500/10'
+                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-400 hover:text-zinc-200'
+                }`}
+                title={groupBySeries ? 'Seri gruplamasını kapat' : 'Serileri birleştir'}
+              >
+                <SeriesIcon size={13} className={groupBySeries ? 'text-amber-400' : 'text-zinc-500'} />
+                <span>Seriler</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsSortModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/90 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 hover:border-amber-500/50 hover:text-amber-400 transition-colors shadow-sm"
+            >
+              <ArrowUpDown size={12} strokeWidth={1.5} className="text-amber-400" />
+              <span className="hidden sm:inline">
+                {SORT_OPTIONS.find(o => o.id === sortOption)?.label.split('(')[0].trim() || 'Sırala'}
+              </span>
+              <span className="sm:hidden">Sırala</span>
+            </button>
+          </div>
         </div>
 
-        {/* Poster Izgarası */}
+        {/* Poster Izgarası (Mobilde 2, Tablette 3-4, Masaüstünde 5-6 Kolon) */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 pt-2">
             {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -658,7 +734,7 @@ export default function Home() {
               />
             ))}
           </div>
-        ) : filteredAndSortedItems.length === 0 ? (
+        ) : feedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-600">
               {activeTab === 'movies' ? (
@@ -688,13 +764,21 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 pt-1">
-            {filteredAndSortedItems.map(item => (
-              <PosterCard
-                key={item.id}
-                item={item}
-                onClick={handleOpenDetail}
-              />
-            ))}
+            {feedItems.map(feedItem =>
+              feedItem.type === 'collection' ? (
+                <CollectionStackCard
+                  key={feedItem.collection.id}
+                  collection={feedItem.collection}
+                  onClick={handleOpenCollection}
+                />
+              ) : (
+                <PosterCard
+                  key={feedItem.item.id}
+                  item={feedItem.item}
+                  onClick={handleOpenDetail}
+                />
+              )
+            )}
           </div>
         )}
       </main>
@@ -752,7 +836,7 @@ export default function Home() {
         onOpenSearch={() => setIsSearchOpen(true)}
       />
 
-      {/* Detay Paneli */}
+      {/* Detay Paneli (Masaüstünde Modal, Mobilde Bottom Sheet) */}
       <MediaDetailBottomSheet
         key={selectedItem?.id || 'none'}
         item={selectedItem}
@@ -763,6 +847,26 @@ export default function Home() {
         }}
         onUpdate={handleUpdateItem}
         onDelete={handleDeleteItem}
+        archiveItems={items}
+        onAddMultiple={handleBatchAddItems}
+      />
+
+      {/* Seri / Koleksiyon Detay Paneli */}
+      <CollectionDetailSheet
+        key={selectedCollection?.id || 'none-col'}
+        collection={selectedCollection}
+        isOpen={isCollectionSheetOpen}
+        onClose={() => {
+          setIsCollectionSheetOpen(false);
+          setSelectedCollection(null);
+        }}
+        onSelectMovie={movie => {
+          setSelectedItem(movie);
+          setIsDetailOpen(true);
+        }}
+        archiveItems={items}
+        onAddMultiple={handleBatchAddItems}
+        onAddSingle={handleAddItem}
       />
 
       {/* Canlı TMDB Arama ve Ekleme Paneli */}

@@ -139,6 +139,7 @@ export async function GET(request: Request) {
       number_of_seasons: data.number_of_seasons || null,
       number_of_episodes: data.number_of_episodes || null,
       status: data.status || null,
+      belongs_to_collection: data.belongs_to_collection || null,
       watch_providers: {
         flatrate,
         buy: buy.map((p: any) => ({
