@@ -179,7 +179,6 @@ export function groupMediaItemsIntoFeed(
 
   // Sadece filmler seriler halinde gruplanır
   const movies = items.filter(i => i.media_type === 'movie');
-  const tvShows = items.filter(i => i.media_type === 'tv');
 
   // 1. Bilinen Franchise'lara göre filmleri eşle
   for (const franchise of KNOWN_FRANCHISES) {

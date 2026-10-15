@@ -14,7 +14,6 @@ import {
   Clock,
   Layers,
   ExternalLink,
-  Flame,
   Search,
   Loader2,
   PlayCircle,
@@ -109,7 +108,7 @@ interface MediaDetailBottomSheetProps {
 }
 
 export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
-  item,
+  item: propItem,
   isOpen,
   onClose,
   onUpdate,
@@ -118,14 +117,29 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
   onAddMultiple,
 }) => {
   const { isAuthenticated, openGate } = useAuth();
-  const [selectedStatus, setSelectedStatus] = useState<MediaStatus>(item?.status ?? 'watchlist');
-  const [selectedRating, setSelectedRating] = useState<CustomRating | null>(item?.custom_rating ?? null);
-  const [personalNote, setPersonalNote] = useState<string>(item?.personal_note ?? '');
+  const [activeItem, setActiveItem] = useState<MediaItem | null>(propItem);
+  const [selectedStatus, setSelectedStatus] = useState<MediaStatus>(propItem?.status ?? 'watchlist');
+  const [selectedRating, setSelectedRating] = useState<CustomRating | null>(propItem?.custom_rating ?? null);
+  const [personalNote, setPersonalNote] = useState<string>(propItem?.personal_note ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
+
+  useEffect(() => {
+    if (propItem) {
+      setActiveItem(propItem);
+      setSelectedStatus(propItem.status);
+      setSelectedRating(propItem.custom_rating);
+      setPersonalNote(propItem.personal_note ?? '');
+      setShowDeleteConfirm(false);
+      setImgError(false);
+      setBackdropError(false);
+    }
+  }, [propItem]);
+
+  const item = propItem || activeItem;
 
   // Watch Providers (Nerede İzlenir?) ve TMDB detayları
   const [watchProviders, setWatchProviders] = useState<{
@@ -138,8 +152,20 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
   // Seri / Franchise Bilgileri ve Toplu Ekleme
   const [seriesInfo, setSeriesInfo] = useState<SeriesData | null>(null);
-  const [isLoadingSeries, setIsLoadingSeries] = useState<boolean>(false);
   const [isAddingSeries, setIsAddingSeries] = useState<boolean>(false);
+
+  // Thumb Swipe-to-Dismiss (Soldan sağa baş parmakla çekerek kapatma)
+  const x = useMotionValue(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const isSwipingRight = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      x.set(0);
+    }
+  }, [isOpen, item?.id, x]);
 
   // Bilinen franchise veya TMDB serisi varsa çek
   useEffect(() => {
@@ -152,19 +178,19 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     const franchise = getFranchiseForMovie(item);
 
     if (franchise) {
-      setIsLoadingSeries(true);
       fetch(`/api/tmdb/collection?franchiseId=${franchise.id}`)
         .then(res => (res.ok ? res.json() : null))
         .then(data => {
           if (!isMounted || !data) return;
           setSeriesInfo(data);
         })
-        .catch(err => console.warn('Failed to fetch franchise info:', err))
-        .finally(() => {
-          if (isMounted) setIsLoadingSeries(false);
-        });
+        .catch(err => console.warn('Failed to fetch franchise info:', err));
     }
-  }, [isOpen, item?.id, item?.media_type]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, item]);
 
   useEffect(() => {
     if (!item?.tmdb_id) return;
@@ -179,17 +205,13 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
         // Eğer bilinen bir franchise değilse ama TMDB koleksiyonu varsa
         if (!getFranchiseForMovie(item) && data.belongs_to_collection?.id) {
-          setIsLoadingSeries(true);
           fetch(`/api/tmdb/collection?id=${data.belongs_to_collection.id}`)
             .then(res => (res.ok ? res.json() : null))
             .then(sData => {
               if (!isMounted || !sData) return;
               setSeriesInfo(sData);
             })
-            .catch(err => console.warn('Failed to fetch collection info:', err))
-            .finally(() => {
-              if (isMounted) setIsLoadingSeries(false);
-            });
+            .catch(err => console.warn('Failed to fetch collection info:', err));
         }
 
         // Dizi ise ve kayıtlı sezon sayısı hatalı/eksikse otomatik düzelt
@@ -218,7 +240,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [item?.id, item?.tmdb_id, item?.media_type, item?.total_seasons, item?.duration, onUpdate]);
+  }, [item, onUpdate]);
 
   // Arşivdeki mevcut filmler ile serideki eksikleri hesapla
   const archiveTmdbIds = useMemo(
@@ -288,8 +310,6 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !item) return null;
-
   // TMDB Image URL resolver
   const formatImageUrl = (path: string | null | undefined, size = 'w500') => {
     if (!path) return null;
@@ -298,12 +318,12 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     return `https://image.tmdb.org/t/p/${size}${cleanPath}`;
   };
 
-  const backdropUrl = !backdropError ? formatImageUrl(item.backdrop_path, 'w780') : null;
-  const posterUrl = !imgError ? formatImageUrl(item.poster_path, 'w500') : null;
+  const backdropUrl = !backdropError && item ? formatImageUrl(item.backdrop_path, 'w780') : null;
+  const posterUrl = !imgError && item ? formatImageUrl(item.poster_path, 'w500') : null;
 
   // Filmlerde "Yeni Sezon Bekleniyor" durumuna gerek yok
   const availableStatuses: MediaStatus[] =
-    item.media_type === 'movie'
+    item?.media_type === 'movie'
       ? ['watchlist', 'watched']
       : ['watchlist', 'watched', 'waiting_season'];
 
@@ -312,6 +332,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       openGate();
       return;
     }
+    if (!item) return;
     setSelectedStatus(newStatus);
     await onUpdate(item.id, { status: newStatus });
   };
@@ -321,6 +342,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       openGate();
       return;
     }
+    if (!item) return;
     const nextRating = selectedRating === level ? null : level;
     setSelectedRating(nextRating);
 
@@ -350,6 +372,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       openGate();
       return;
     }
+    if (!item) return;
     setIsSaving(true);
     await onUpdate(item.id, { personal_note: personalNote.trim() || null });
     setIsSaving(false);
@@ -360,6 +383,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
       openGate();
       return;
     }
+    if (!item) return;
     setIsDeleting(true);
     await onDelete(item.id);
     setIsDeleting(false);
@@ -368,19 +392,6 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
   // Türkçe karakter uyumlu karakter sayısı hesabı
   const remainingChars = Math.max(0, 200 - Array.from(personalNote).length);
-
-  // Thumb Swipe-to-Dismiss (Soldan sağa baş parmakla çekerek kapatma)
-  const x = useMotionValue(0);
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const touchStartTime = useRef<number>(0);
-  const isSwipingRight = useRef<boolean | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      x.set(0);
-    }
-  }, [isOpen, item?.id, x]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
@@ -442,11 +453,10 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
           setTimeout(() => x.set(0), 100);
         });
       } else {
-        // Yeterince çekilmediyse yay efektiyle yerine geri otursun
+        // Yeterince çekilmediyse Apple easing ile yerine geri otursun
         animate(x, 0, {
-          type: 'spring',
-          damping: 26,
-          stiffness: 350,
+          duration: 0.22,
+          ease: [0.16, 1, 0.3, 1],
         });
       }
     }
@@ -458,32 +468,34 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
   return (
     <AnimatePresence>
-      <div
-        className="fixed inset-0 z-50 flex items-end md:items-center justify-center cursor-pointer select-none"
-        onClick={onClose}
-      >
-        {/* Backdrop overlay */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+      {isOpen && item && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center cursor-pointer select-none"
           onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
-        />
-
-        {/* Modal / Bottom Sheet Window */}
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          style={{ x }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onClick={e => e.stopPropagation()}
-          className="relative max-h-[92vh] md:max-h-[88vh] w-full max-w-lg md:max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800/80 bg-zinc-950 pb-28 md:pb-8 pt-3 text-zinc-100 shadow-2xl scrollbar-none z-10 md:my-auto cursor-default select-text touch-pan-y"
         >
+          {/* Backdrop overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Modal / Bottom Sheet Window */}
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={{ x }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onClick={e => e.stopPropagation()}
+            className="relative max-h-[92vh] md:max-h-[88vh] w-full max-w-lg md:max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800/80 bg-zinc-950 pb-28 md:pb-8 pt-3 text-zinc-100 shadow-2xl scrollbar-none z-10 md:my-auto cursor-default select-text touch-pan-y"
+          >
           {/* Mobile Grab Handle (Tıklanabilir Kapatma) */}
           <div
             onClick={onClose}
@@ -652,7 +664,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                   <button
                     onClick={handleBatchAddSeries}
                     disabled={isAddingSeries}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-zinc-950 py-2.5 px-3 text-xs font-bold transition shadow-md shadow-amber-500/20 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:opacity-85 text-zinc-950 py-2.5 px-3 text-xs font-bold transition shadow-md shadow-amber-500/20 disabled:opacity-50"
                   >
                     {isAddingSeries ? (
                       <>
@@ -727,7 +739,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                             href={getPlatformUrl(p.provider_name, item.title)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:scale-95 group"
+                            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:opacity-80 group"
                             title={`${p.provider_name}'de aç`}
                           >
                             {p.logo_path ? (
@@ -755,7 +767,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                           href={getPlatformUrl('hdfilmcehennemi', item.title)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:scale-95 group"
+                          className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:opacity-80 group"
                           title="HDFilmcehennemi'nde ara / izle"
                         >
                           <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/15 text-amber-400 flex-shrink-0">
@@ -933,6 +945,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };

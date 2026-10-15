@@ -44,7 +44,7 @@ interface CollectionDetailSheetProps {
 }
 
 export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
-  collection,
+  collection: propCollection,
   isOpen,
   onClose,
   onSelectMovie,
@@ -53,6 +53,15 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
   onAddSingle,
 }) => {
   const { isAuthenticated, openGate } = useAuth();
+  const [activeCollection, setActiveCollection] = useState<CollectionGroup | null>(propCollection);
+
+  useEffect(() => {
+    if (propCollection) {
+      setActiveCollection(propCollection);
+    }
+  }, [propCollection]);
+
+  const collection = propCollection || activeCollection;
   const [fullParts, setFullParts] = useState<CollectionPart[]>([]);
   const [isLoadingParts, setIsLoadingParts] = useState<boolean>(false);
   const [isAddingAll, setIsAddingAll] = useState<boolean>(false);
@@ -124,7 +133,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, collection?.id, collection?.tmdb_collection_id]);
+  }, [isOpen, collection]);
 
   // Arşivdeki filmlerin eşleme haritası
   const archiveMap = useMemo(() => {
@@ -316,9 +325,8 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
         });
       } else {
         animate(x, 0, {
-          type: 'spring',
-          damping: 26,
-          stiffness: 350,
+          duration: 0.22,
+          ease: [0.16, 1, 0.3, 1],
         });
       }
     }
@@ -328,11 +336,9 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
     isSwipingRight.current = null;
   };
 
-  if (!isOpen || !collection) return null;
-
-  const backdropUrl = collection.backdrop_path
+  const backdropUrl = collection?.backdrop_path
     ? `https://image.tmdb.org/t/p/w780${collection.backdrop_path}`
-    : collection.items[0]?.backdrop_path
+    : collection?.items[0]?.backdrop_path
     ? `https://image.tmdb.org/t/p/w780${collection.items[0].backdrop_path}`
     : null;
 
@@ -340,39 +346,41 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        {/* Karartma Katmanı */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
-        />
-
-        {/* Modal / Bottom Sheet Gövdesi */}
-        <motion.div
-          initial={{ y: '100%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          style={{ x }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className="relative z-10 w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] overflow-y-auto rounded-t-[28px] sm:rounded-3xl border border-zinc-800/90 bg-zinc-950 pb-8 text-zinc-100 shadow-2xl shadow-black/80 flex flex-col"
-        >
-          {/* Mobil Sürükleme Çizgisi */}
-          <div className="sticky top-0 z-30 flex justify-center pt-2.5 pb-1 bg-zinc-950/70 backdrop-blur-md sm:hidden">
-            <div className="h-1.5 w-12 rounded-full bg-zinc-700/80" />
-          </div>
-
-          {/* Kapat Butonu */}
-          <button
+      {isOpen && collection && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          {/* Karartma Katmanı */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
             onClick={onClose}
-            className="absolute top-4 right-4 z-30 rounded-full bg-zinc-900/80 p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition active:scale-95 border border-zinc-800/80 backdrop-blur-md"
-            aria-label="Kapat"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Modal / Bottom Sheet Gövdesi */}
+          <motion.div
+            initial={{ y: '100%', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={{ x }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="relative z-10 w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] overflow-y-auto rounded-t-[28px] sm:rounded-3xl border border-zinc-800/90 bg-zinc-950 pb-8 text-zinc-100 shadow-2xl shadow-black/80 flex flex-col"
           >
+            {/* Mobil Sürükleme Çizgisi */}
+            <div className="sticky top-0 z-30 flex justify-center pt-2.5 pb-1 bg-zinc-950/70 backdrop-blur-md sm:hidden">
+              <div className="h-1.5 w-12 rounded-full bg-zinc-700/80" />
+            </div>
+
+            {/* Kapat Butonu */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 z-30 rounded-full bg-zinc-900/80 p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition active:opacity-75 border border-zinc-800/80 backdrop-blur-md"
+              aria-label="Kapat"
+            >
             <X size={18} strokeWidth={2} />
           </button>
 
@@ -463,7 +471,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
                 <button
                   onClick={handleBatchAddMissing}
                   disabled={isAddingAll}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-zinc-950 px-3.5 py-2 text-xs font-bold shadow-md shadow-amber-500/20 transition disabled:opacity-50 flex-shrink-0"
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:opacity-85 text-zinc-950 px-3.5 py-2 text-xs font-bold shadow-md shadow-amber-500/20 transition disabled:opacity-50 flex-shrink-0"
                 >
                   {isAddingAll ? (
                     <>
@@ -521,7 +529,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
                           onSelectMovie(movie.archiveItem);
                         }
                       }}
-                      className={`group relative flex items-center gap-3 rounded-2xl border p-2.5 transition active:scale-[0.98] ${
+                      className={`group relative flex items-center gap-3 rounded-2xl border p-2.5 transition active:opacity-85 ${
                         movie.inArchive ? 'cursor-pointer' : 'cursor-default'
                       } ${
                         isNext
@@ -626,7 +634,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
                               handleAddSingleMissing(movie);
                             }}
                             disabled={addingSingleId === movie.partId}
-                            className="flex items-center gap-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 px-2.5 py-1 text-xs font-semibold transition active:scale-95 disabled:opacity-50"
+                            className="flex items-center gap-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 px-2.5 py-1 text-xs font-semibold transition active:opacity-85 disabled:opacity-50"
                           >
                             {addingSingleId === movie.partId ? (
                               <Loader2 size={12} className="animate-spin text-amber-300" />
@@ -645,6 +653,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };

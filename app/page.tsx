@@ -15,7 +15,7 @@ import {
   Layers,
   Check,
 } from 'lucide-react';
-import { CollectionGroup, FeedItem, MediaItem, MediaStatus, MediaType, SortOption } from '@/lib/types';
+import { CollectionGroup, MediaItem, MediaStatus, MediaType, SortOption } from '@/lib/types';
 import { STATUS_CONFIG, SORT_OPTIONS } from '@/lib/constants';
 import {
   getMediaItems,
@@ -317,7 +317,6 @@ export default function Home() {
       setItems(prev => prev.filter(i => i.id !== id));
       if (selectedItem?.id === id) {
         setIsDetailOpen(false);
-        setSelectedItem(null);
       }
       showToast('Yapım arşivden kaldırıldı.');
     }
@@ -536,27 +535,21 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 pt-4">
-        {/* Status Filter Tabs */}
-        <div className="relative flex items-center justify-between gap-1 p-1 rounded-2xl border border-zinc-850 bg-zinc-950/80 shadow-inner w-full mb-3 overflow-hidden">
+        {/* Status Filter Tabs (Sakin, zıplama yapmayan, sabit genişlikli segment bar) */}
+        <div className="flex items-center gap-1 p-1 rounded-2xl border border-zinc-850 bg-zinc-950/80 shadow-inner w-full mb-3">
           {/* Tümü (All) */}
           <button
             type="button"
             onClick={() => handleSelectStatus('all')}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 transition-all duration-300 ease-out active:scale-95 ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 px-1 sm:px-2.5 transition-colors duration-150 active:opacity-85 ${
               activeStatus === 'all'
-                ? 'flex-1 min-w-0 bg-amber-500 text-zinc-950 font-bold shadow-sm shadow-amber-500/20 px-2.5 sm:px-3'
-                : 'flex-shrink-0 px-2 sm:px-2.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
             }`}
             title="Tümü"
           >
-            <Layers size={14} strokeWidth={1.75} className="flex-shrink-0" />
-            <span
-              className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold min-w-0 ${
-                activeStatus === 'all' ? 'max-w-[70px] opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              <span className="truncate">Tümü</span>
-            </span>
+            <Layers size={13} strokeWidth={1.75} className="flex-shrink-0" />
+            <span className="text-xs font-bold truncate">Tümü</span>
             <span
               className={`flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none ${
                 activeStatus === 'all' ? 'bg-zinc-950/20 text-zinc-950 font-bold' : 'bg-zinc-850 text-zinc-400'
@@ -577,43 +570,39 @@ export default function Home() {
                 key={statusKey}
                 type="button"
                 onClick={() => handleSelectStatus(statusKey)}
-                className={`flex items-center justify-center gap-1.5 rounded-xl py-2 transition-all duration-300 ease-out active:scale-95 ${
+                className={`flex-1 min-w-0 flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 px-1 sm:px-2.5 transition-colors duration-150 active:opacity-85 ${
                   isSelected
-                    ? `flex-1 min-w-0 ${
+                    ? `${
                         statusKey === 'watchlist'
                           ? 'bg-blue-500/15 text-blue-400 border border-blue-500/40 shadow-sm shadow-blue-500/15'
                           : statusKey === 'watched'
                           ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-500/15'
                           : 'bg-purple-500/15 text-purple-400 border border-purple-500/40 shadow-sm shadow-purple-500/15'
-                      } font-semibold px-2.5 sm:px-3`
-                    : 'flex-shrink-0 px-2 sm:px-2.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                      } font-semibold`
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 border border-transparent'
                 }`}
                 title={conf.label}
               >
                 <span className="flex-shrink-0">
                   <StatusIcon
                     status={statusKey}
-                    size={14}
+                    size={13}
                     strokeWidth={1.75}
                     className={isSelected ? 'text-current' : 'text-zinc-400'}
                   />
                 </span>
 
-                <span
-                  className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-semibold min-w-0 ${
-                    isSelected ? 'max-w-[90px] sm:max-w-[170px] opacity-100' : 'max-w-0 opacity-0'
-                  }`}
-                >
+                <span className="text-xs font-semibold truncate">
                   {statusKey === 'watched' ? (
-                    <span className="truncate">
-                      İzlendi<span className="hidden sm:inline">&nbsp;/ Bitti</span>
-                    </span>
+                    <>
+                      İzlendi<span className="hidden md:inline">&nbsp;/ Bitti</span>
+                    </>
                   ) : statusKey === 'waiting_season' ? (
-                    <span className="truncate">
-                      Yeni Sezon<span className="hidden sm:inline">&nbsp;Bekleniyor</span>
-                    </span>
+                    <>
+                      Yeni Sezon<span className="hidden md:inline">&nbsp;Bekleniyor</span>
+                    </>
                   ) : (
-                    <span className="truncate">{conf.label}</span>
+                    conf.label
                   )}
                 </span>
 
@@ -659,7 +648,7 @@ export default function Home() {
                         prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
                       );
                     }}
-                    className={`flex-shrink-0 flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium border transition active:scale-95 ${
+                    className={`flex-shrink-0 flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium border transition active:opacity-75 ${
                       isSelected
                         ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 font-semibold shadow-sm shadow-amber-500/10'
                         : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:text-zinc-200'
@@ -698,7 +687,7 @@ export default function Home() {
                     return next;
                   });
                 }}
-                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition active:scale-95 shadow-sm ${
+                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition active:opacity-80 shadow-sm ${
                   groupBySeries
                     ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-amber-500/10'
                     : 'border-zinc-800 bg-zinc-900/90 text-zinc-400 hover:text-zinc-200'
@@ -756,7 +745,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-zinc-950 hover:bg-amber-400 transition active:scale-95 shadow-md shadow-amber-500/20"
+              className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-zinc-950 hover:bg-amber-400 transition active:opacity-85 shadow-md shadow-amber-500/20"
             >
               <Plus size={15} strokeWidth={1.75} />
               <span>Film & Dizi Ekle</span>
@@ -838,12 +827,10 @@ export default function Home() {
 
       {/* Detay Paneli (Masaüstünde Modal, Mobilde Bottom Sheet) */}
       <MediaDetailBottomSheet
-        key={selectedItem?.id || 'none'}
         item={selectedItem}
         isOpen={isDetailOpen}
         onClose={() => {
           setIsDetailOpen(false);
-          setSelectedItem(null);
         }}
         onUpdate={handleUpdateItem}
         onDelete={handleDeleteItem}
@@ -853,12 +840,10 @@ export default function Home() {
 
       {/* Seri / Koleksiyon Detay Paneli */}
       <CollectionDetailSheet
-        key={selectedCollection?.id || 'none-col'}
         collection={selectedCollection}
         isOpen={isCollectionSheetOpen}
         onClose={() => {
           setIsCollectionSheetOpen(false);
-          setSelectedCollection(null);
         }}
         onSelectMovie={movie => {
           setSelectedItem(movie);

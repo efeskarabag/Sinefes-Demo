@@ -11,6 +11,17 @@ interface CollectionPart {
   overview: string;
 }
 
+interface TmdbRawPart {
+  id: number;
+  title?: string;
+  name?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  release_date?: string | null;
+  vote_average?: number;
+  overview?: string;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -36,7 +47,7 @@ export async function GET(request: Request) {
         fetch(`https://api.themoviedb.org/3/movie/340102?api_key=${apiKey}&language=tr-TR`, { next: { revalidate: 86400 } }).then(r => r.ok ? r.json() : null),
       ]);
 
-      const rawParts: any[] = [
+      const rawParts: TmdbRawPart[] = [
         ...(cMain?.parts || []),
         ...(cWolv?.parts || []),
         ...(cDead?.parts || []),
@@ -47,7 +58,7 @@ export async function GET(request: Request) {
       }
 
       // ID'ye göre tekilleştir (Mükerrer part olmasın)
-      const uniqueMap = new Map<number, any>();
+      const uniqueMap = new Map<number, TmdbRawPart>();
       rawParts.forEach(p => {
         if (p?.id && !uniqueMap.has(p.id)) {
           uniqueMap.set(p.id, p);
@@ -84,7 +95,7 @@ export async function GET(request: Request) {
         fetch(`https://api.themoviedb.org/3/collection/121938?api_key=${apiKey}&language=tr-TR`, { next: { revalidate: 86400 } }).then(r => r.ok ? r.json() : null),
       ]);
 
-      const rawParts: any[] = [
+      const rawParts: TmdbRawPart[] = [
         ...(cLotr?.parts || []),
         ...(cHobbit?.parts || []),
       ];
@@ -92,7 +103,7 @@ export async function GET(request: Request) {
       const parts: CollectionPart[] = rawParts
         .map(p => ({
           id: p.id,
-          title: p.title || p.name,
+          title: p.title || p.name || 'İsimsiz Film',
           poster_path: p.poster_path || null,
           backdrop_path: p.backdrop_path || null,
           release_date: p.release_date || null,
@@ -137,9 +148,9 @@ export async function GET(request: Request) {
 
     const parts: CollectionPart[] = Array.isArray(data.parts)
       ? data.parts
-          .map((p: any) => ({
+          .map((p: TmdbRawPart) => ({
             id: p.id,
-            title: p.title || p.name,
+            title: p.title || p.name || 'İsimsiz Film',
             poster_path: p.poster_path || null,
             backdrop_path: p.backdrop_path || null,
             release_date: p.release_date || null,

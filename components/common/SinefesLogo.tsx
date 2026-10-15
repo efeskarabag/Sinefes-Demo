@@ -19,7 +19,7 @@ export const SinefesLogo: React.FC<SinefesLogoProps> = ({
       {/* Sinefes S-Filmstrip Loop Emblem (Centered, Standalone) */}
       <div
         style={{ width: size, height: size }}
-        className="relative flex-shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-[#0c0d12] shadow-sm transition-transform duration-300 hover:scale-105"
+        className="relative flex-shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-[#0c0d12] shadow-sm transition-opacity duration-200 hover:opacity-90"
       >
         <Image
           src="/sinefes-logo.png"

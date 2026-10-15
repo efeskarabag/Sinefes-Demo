@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Crown, Star, Film, CheckCircle2 } from 'lucide-react';
+import { Crown, Star } from 'lucide-react';
 import { CollectionGroup } from '@/lib/types';
 import { SeriesIcon } from '@/components/media/MediaIcons';
 
@@ -56,7 +56,7 @@ export const CollectionStackCard: React.FC<CollectionStackCardProps> = ({
   return (
     <div
       onClick={() => onClick(collection)}
-      className="group relative cursor-pointer flex flex-col select-none transition-transform duration-200 active:scale-[0.97]"
+      className="group relative cursor-pointer flex flex-col select-none transition-opacity duration-150 active:opacity-90"
     >
       {/* 3D Deste / Yığın Katmanları (Stack Effect) */}
       <div className="relative aspect-[2/3] w-full">

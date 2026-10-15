@@ -50,7 +50,7 @@ export const MobileNoticeBadge: React.FC = () => {
       <button
         type="button"
         onClick={handleClose}
-        className="ml-1 flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors active:scale-95 cursor-pointer"
+        className="ml-1 flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors active:opacity-80 cursor-pointer"
         title="Bildirimi Kapat"
         aria-label="Kapat"
       >

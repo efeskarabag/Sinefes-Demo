@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Star, Film, Tv, Plus, Check, Loader2, Sparkles } from 'lucide-react';
@@ -28,11 +28,11 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setQuery('');
     setResults([]);
     onClose();
-  };
+  }, [onClose]);
 
   const handleQueryChange = (val: string) => {
     setQuery(val);
@@ -67,9 +67,9 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
         clearTimeout(focusTimer);
       };
     }
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
 
-  // Debounced TMDB search
+  // Debounced search
   useEffect(() => {
     if (!query.trim()) return;
 
@@ -158,32 +158,32 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
     setAddingId(null);
   };
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
-      <div
-        className="fixed inset-0 z-50 flex items-end md:items-center justify-center cursor-pointer select-none"
-        onClick={handleClose}
-      >
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center cursor-pointer select-none"
           onClick={handleClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
-        />
-
-        {/* Modal Window */}
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          onClick={e => e.stopPropagation()}
-          className="relative flex h-[85vh] md:h-[75vh] w-full max-w-lg md:max-w-xl flex-col overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800 bg-zinc-950 pb-8 pt-3 text-zinc-100 shadow-2xl z-10 md:my-auto cursor-default select-text"
         >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={handleClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Modal Window */}
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            onClick={e => e.stopPropagation()}
+            className="relative flex h-[85vh] md:h-[75vh] w-full max-w-lg md:max-w-xl flex-col overscroll-contain rounded-t-3xl md:rounded-3xl border border-zinc-800 bg-zinc-950 pb-8 pt-3 text-zinc-100 shadow-2xl z-10 md:my-auto cursor-default select-text"
+          >
           {/* Mobile Grab Handle */}
           <div
             onClick={handleClose}
@@ -328,7 +328,7 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
                         type="button"
                         onClick={() => handleAdd(res)}
                         disabled={isAlreadyInArchive || isCurrentlyAdding}
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
+                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border transition active:opacity-80 ${
                           isAlreadyInArchive
                             ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 cursor-default'
                             : 'border-zinc-800 bg-zinc-900 text-zinc-200 hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-400'
@@ -351,6 +351,7 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };

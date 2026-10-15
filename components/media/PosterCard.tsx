@@ -38,7 +38,7 @@ export const PosterCard: React.FC<PosterCardProps> = ({ item, onClick }) => {
   return (
     <div
       onClick={() => onClick(item)}
-      className="group relative cursor-pointer flex flex-col select-none transition-transform duration-200 active:scale-[0.97]"
+      className="group relative cursor-pointer flex flex-col select-none transition-opacity duration-150 active:opacity-90"
     >
       {/* 2/3 Aspect Ratio Poster Container */}
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800/80 shadow-md transition-all duration-300 group-hover:border-zinc-700 group-hover:shadow-xl group-hover:shadow-amber-500/5">

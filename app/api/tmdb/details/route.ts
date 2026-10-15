@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { WatchProvider } from '@/lib/types';
 
 function getCanonicalPlatformKey(name: string): string {
   const n = name
@@ -142,12 +143,12 @@ export async function GET(request: Request) {
       belongs_to_collection: data.belongs_to_collection || null,
       watch_providers: {
         flatrate,
-        buy: buy.map((p: any) => ({
+        buy: buy.map((p: WatchProvider) => ({
           provider_id: p.provider_id,
           provider_name: p.provider_name,
           logo_path: p.logo_path,
         })),
-        rent: rent.map((p: any) => ({
+        rent: rent.map((p: WatchProvider) => ({
           provider_id: p.provider_id,
           provider_name: p.provider_name,
           logo_path: p.logo_path,
