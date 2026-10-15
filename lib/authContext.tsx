@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsGateOpen(false);
   };
 
-  // PIN doğrulaması (110795 veya sunucu doğrulaması)
+  // PIN doğrulaması (123456 veya sunucu doğrulaması)
   const verifyPin = async (enteredPin: string): Promise<boolean> => {
     const trimmed = enteredPin.trim();
 
