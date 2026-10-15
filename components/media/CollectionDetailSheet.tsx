@@ -43,6 +43,9 @@ interface CollectionDetailSheetProps {
   onAddSingle: (item: Omit<MediaItem, 'id' | 'created_at'>) => Promise<void>;
 }
 
+// Seriler için hafıza önbelleği (Tekrar yükleme ve zıplamaları sıfırlar)
+const collectionPartsCache = new Map<string, CollectionPart[]>();
+
 export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
   collection: propCollection,
   isOpen,
@@ -66,6 +69,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
   const [isLoadingParts, setIsLoadingParts] = useState<boolean>(false);
   const [isAddingAll, setIsAddingAll] = useState<boolean>(false);
   const [addingSingleId, setAddingSingleId] = useState<number | null>(null);
+  const loadedCollectionKeyRef = useRef<string | null>(null);
 
   // Thumb Swipe-to-Dismiss (Soldan sağa baş parmakla çekerek kapatma)
   const x = useMotionValue(0);
@@ -103,14 +107,26 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
     };
   }, [isOpen, onClose]);
 
-  // Serinin TMDB'deki tüm filmlerini (parts) çek
+  // Serinin TMDB'deki tüm filmlerini (parts) çek — Önbellekli ve Sıfır Zıplama
   useEffect(() => {
     if (!isOpen || !collection) {
-      setFullParts([]);
       return;
     }
 
+    if (loadedCollectionKeyRef.current === collection.id) {
+      return;
+    }
+
+    loadedCollectionKeyRef.current = collection.id;
     let isMounted = true;
+
+    // Cache kontrolü
+    if (collectionPartsCache.has(collection.id)) {
+      setFullParts(collectionPartsCache.get(collection.id)!);
+      setIsLoadingParts(false);
+      return;
+    }
+
     setIsLoadingParts(true);
 
     const queryParam = collection.id.startsWith('franchise-')
@@ -122,6 +138,7 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
       .then(data => {
         if (!isMounted || !data) return;
         if (Array.isArray(data.parts)) {
+          collectionPartsCache.set(collection.id, data.parts);
           setFullParts(data.parts);
         }
       })

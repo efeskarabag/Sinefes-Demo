@@ -97,6 +97,22 @@ interface SeriesData {
   parts: SeriesPartItem[];
 }
 
+// TMDB In-Memory Caches — prevents duplicate network requests and eliminates layout shifts
+interface DetailsCacheEntry {
+  watch_providers: {
+    flatrate: WatchProvider[];
+    buy: WatchProvider[];
+    rent: WatchProvider[];
+    link: string | null;
+  } | null;
+  belongs_to_collection?: { id: number; name: string } | null;
+  runtime?: number;
+  number_of_seasons?: number;
+}
+
+const detailsCache = new Map<string, DetailsCacheEntry>();
+const seriesCache = new Map<string, SeriesData>();
+
 interface MediaDetailBottomSheetProps {
   item: MediaItem | null;
   isOpen: boolean;
@@ -127,19 +143,36 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
   const [imgError, setImgError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
 
+  const item = propItem || activeItem;
+
+  const onUpdateRef = useRef(onUpdate);
+  const itemRef = useRef(item);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+    itemRef.current = item;
+  });
+
+  const loadedDetailsKeyRef = useRef<string | null>(null);
+  const lastActiveItemId = useRef<string | null>(null);
+
   useEffect(() => {
     if (propItem) {
+      const isNewItem = lastActiveItemId.current !== propItem.id;
+      lastActiveItemId.current = propItem.id;
+
       setActiveItem(propItem);
       setSelectedStatus(propItem.status);
       setSelectedRating(propItem.custom_rating);
-      setPersonalNote(propItem.personal_note ?? '');
-      setShowDeleteConfirm(false);
-      setImgError(false);
-      setBackdropError(false);
+
+      if (isNewItem) {
+        setPersonalNote(propItem.personal_note ?? '');
+        setShowDeleteConfirm(false);
+        setImgError(false);
+        setBackdropError(false);
+      }
     }
   }, [propItem]);
-
-  const item = propItem || activeItem;
 
   // Watch Providers (Nerede İzlenir?) ve TMDB detayları
   const [watchProviders, setWatchProviders] = useState<{
@@ -167,69 +200,113 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     }
   }, [isOpen, item?.id, x]);
 
-  // Bilinen franchise veya TMDB serisi varsa çek
+  // TMDB Detayları, Nerede İzlenir & Seri / Franchise Verisini Çekme (Tamponlanmış / Sıfır Zıplama)
   useEffect(() => {
-    if (!isOpen || !item || item.media_type !== 'movie') {
-      setSeriesInfo(null);
+    if (!isOpen || !item?.tmdb_id) {
       return;
     }
 
-    let isMounted = true;
-    const franchise = getFranchiseForMovie(item);
+    const currentKey = `${item.media_type}-${item.tmdb_id}`;
 
-    if (franchise) {
-      fetch(`/api/tmdb/collection?franchiseId=${franchise.id}`)
-        .then(res => (res.ok ? res.json() : null))
-        .then(data => {
-          if (!isMounted || !data) return;
-          setSeriesInfo(data);
-        })
-        .catch(err => console.warn('Failed to fetch franchise info:', err));
+    // Bu yapımın detayları halihazırda yüklendiyse kesinlikle yeniden yükleme veya zıplama yapma
+    if (loadedDetailsKeyRef.current === currentKey) {
+      return;
     }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, item]);
-
-  useEffect(() => {
-    if (!item?.tmdb_id) return;
+    loadedDetailsKeyRef.current = currentKey;
     let isMounted = true;
+
+    // 1. Önce hafızadaki önbelleğe (cache) bak
+    if (detailsCache.has(currentKey)) {
+      const cached = detailsCache.get(currentKey)!;
+      setWatchProviders(cached.watch_providers);
+      setIsLoadingDetails(false);
+
+      // Franchise/Seri bilgisi cache'te varsa anında yerleştir
+      const franchise = item.media_type === 'movie' ? getFranchiseForMovie(item) : null;
+      if (franchise) {
+        const fKey = `franchise-${franchise.id}`;
+        if (seriesCache.has(fKey)) {
+          setSeriesInfo(seriesCache.get(fKey)!);
+        }
+      } else if (cached.belongs_to_collection?.id) {
+        const colKey = `collection-${cached.belongs_to_collection.id}`;
+        if (seriesCache.has(colKey)) {
+          setSeriesInfo(seriesCache.get(colKey)!);
+        }
+      }
+      return;
+    }
+
+    // 2. Cache'te yoksa API'den çek
     setIsLoadingDetails(true);
+
+    // Bilinen bir franchise ise seriyi de paralel çek
+    const franchise = item.media_type === 'movie' ? getFranchiseForMovie(item) : null;
+    if (franchise) {
+      const fKey = `franchise-${franchise.id}`;
+      if (seriesCache.has(fKey)) {
+        setSeriesInfo(seriesCache.get(fKey)!);
+      } else {
+        fetch(`/api/tmdb/collection?franchiseId=${franchise.id}`)
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (!isMounted || !data) return;
+            seriesCache.set(fKey, data);
+            setSeriesInfo(data);
+          })
+          .catch(err => console.warn('Failed to fetch franchise info:', err));
+      }
+    }
 
     fetch(`/api/tmdb/details?id=${item.tmdb_id}&type=${item.media_type}`)
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (!isMounted || !data) return;
+
+        detailsCache.set(currentKey, {
+          watch_providers: data.watch_providers || null,
+          belongs_to_collection: data.belongs_to_collection || null,
+          runtime: data.runtime,
+          number_of_seasons: data.number_of_seasons,
+        });
+
         setWatchProviders(data.watch_providers || null);
 
-        // Eğer bilinen bir franchise değilse ama TMDB koleksiyonu varsa
-        if (!getFranchiseForMovie(item) && data.belongs_to_collection?.id) {
-          fetch(`/api/tmdb/collection?id=${data.belongs_to_collection.id}`)
-            .then(res => (res.ok ? res.json() : null))
-            .then(sData => {
-              if (!isMounted || !sData) return;
-              setSeriesInfo(sData);
-            })
-            .catch(err => console.warn('Failed to fetch collection info:', err));
+        // TMDB Koleksiyonu kontrolü (eğer bilinen franchise değilse)
+        if (!franchise && data.belongs_to_collection?.id) {
+          const colKey = `collection-${data.belongs_to_collection.id}`;
+          if (seriesCache.has(colKey)) {
+            setSeriesInfo(seriesCache.get(colKey)!);
+          } else {
+            fetch(`/api/tmdb/collection?id=${data.belongs_to_collection.id}`)
+              .then(res => (res.ok ? res.json() : null))
+              .then(sData => {
+                if (!isMounted || !sData) return;
+                seriesCache.set(colKey, sData);
+                setSeriesInfo(sData);
+              })
+              .catch(err => console.warn('Failed to fetch collection info:', err));
+          }
         }
 
-        // Dizi ise ve kayıtlı sezon sayısı hatalı/eksikse otomatik düzelt
+        // Sezon / Süre otomatik arka plan düzeltmeleri
+        const currentItem = itemRef.current;
         if (
-          item.media_type === 'tv' &&
+          currentItem &&
+          currentItem.media_type === 'tv' &&
           data.number_of_seasons &&
-          data.number_of_seasons !== item.total_seasons
+          data.number_of_seasons !== currentItem.total_seasons
         ) {
-          onUpdate(item.id, { total_seasons: data.number_of_seasons });
+          onUpdateRef.current(currentItem.id, { total_seasons: data.number_of_seasons });
         }
-
-        // Film ise ve süre eksikse otomatik düzelt
         if (
-          item.media_type === 'movie' &&
+          currentItem &&
+          currentItem.media_type === 'movie' &&
           data.runtime &&
-          !item.duration
+          !currentItem.duration
         ) {
-          onUpdate(item.id, { duration: `${data.runtime} dk` });
+          onUpdateRef.current(currentItem.id, { duration: `${data.runtime} dk` });
         }
       })
       .catch(err => console.warn('Failed to fetch media details in sheet:', err))
@@ -240,7 +317,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [item, onUpdate]);
+  }, [isOpen, item]);
 
   // Arşivdeki mevcut filmler ile serideki eksikleri hesapla
   const archiveTmdbIds = useMemo(
@@ -713,76 +790,78 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                 </div>
               </div>
 
-              {/* Platform Listesi */}
-              {isLoadingDetails ? (
-                <div className="flex items-center justify-center py-3 text-zinc-500 gap-2 text-xs">
-                  <Loader2 size={14} className="animate-spin text-amber-400" />
-                  <span>Platformlar kontrol ediliyor...</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {/* Tüm Platformlar (Netflix, Disney+, Prime, BluTV & HDFilmcehennemi) */}
-                  {(() => {
-                    const official = [
-                      ...(watchProviders?.flatrate || []),
-                      ...(watchProviders?.flatrate?.length ? [] : (watchProviders?.rent || []).slice(0, 2)),
-                    ];
-                    const unique = Array.from(
-                      new Map(official.map(p => [p.provider_id, p])).values()
-                    );
+              {/* Platform Listesi — Sabit min-h-[38px] ve asla sıfırlanmayan platform yapısı */}
+              <div className="min-h-[38px] flex items-center">
+                {isLoadingDetails && !watchProviders ? (
+                  <div className="flex items-center gap-2 w-full py-1">
+                    <div className="h-8 w-28 rounded-xl bg-zinc-850/80 animate-pulse border border-zinc-800/50" />
+                    <div className="h-8 w-32 rounded-xl bg-zinc-850/60 animate-pulse border border-zinc-800/40" />
+                  </div>
+                ) : (
+                  <div className="w-full space-y-2">
+                    {/* Tüm Platformlar (Netflix, Disney+, Prime, BluTV & HDFilmcehennemi) */}
+                    {(() => {
+                      const official = [
+                        ...(watchProviders?.flatrate || []),
+                        ...(watchProviders?.flatrate?.length ? [] : (watchProviders?.rent || []).slice(0, 2)),
+                      ];
+                      const unique = Array.from(
+                        new Map(official.map(p => [p.provider_id, p])).values()
+                      );
 
-                    return (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {unique.map(p => (
+                      return (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {unique.map(p => (
+                            <a
+                              key={p.provider_id}
+                              href={getPlatformUrl(p.provider_name, item.title)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition-colors duration-150 active:opacity-80 group"
+                              title={`${p.provider_name}'de aç`}
+                            >
+                              {p.logo_path ? (
+                                <Image
+                                  src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                                  alt={p.provider_name}
+                                  width={20}
+                                  height={20}
+                                  className="rounded-md object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-850 text-zinc-400">
+                                  <Tv size={12} strokeWidth={1.5} />
+                                </div>
+                              )}
+                              <span className="text-xs font-medium text-zinc-200">
+                                {p.provider_name}
+                              </span>
+                              <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
+                            </a>
+                          ))}
+
+                          {/* HDFilmcehennemi — Standart Eşit Bir Platform Kartı Olarak */}
                           <a
-                            key={p.provider_id}
-                            href={getPlatformUrl(p.provider_name, item.title)}
+                            href={getPlatformUrl('hdfilmcehennemi', item.title)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:opacity-80 group"
-                            title={`${p.provider_name}'de aç`}
+                            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition-colors duration-150 active:opacity-80 group"
+                            title="HDFilmcehennemi'nde ara / izle"
                           >
-                            {p.logo_path ? (
-                              <Image
-                                src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                                alt={p.provider_name}
-                                width={20}
-                                height={20}
-                                className="rounded-md object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-850 text-zinc-400">
-                                <Tv size={12} strokeWidth={1.5} />
-                              </div>
-                            )}
+                            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/15 text-amber-400 flex-shrink-0">
+                              <Film size={12} strokeWidth={1.75} />
+                            </div>
                             <span className="text-xs font-medium text-zinc-200">
-                              {p.provider_name}
+                              HDFilmcehennemi
                             </span>
                             <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
                           </a>
-                        ))}
-
-                        {/* HDFilmcehennemi — Standart Eşit Bir Platform Kartı Olarak */}
-                        <a
-                          href={getPlatformUrl('hdfilmcehennemi', item.title)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition active:opacity-80 group"
-                          title="HDFilmcehennemi'nde ara / izle"
-                        >
-                          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/15 text-amber-400 flex-shrink-0">
-                            <Film size={12} strokeWidth={1.75} />
-                          </div>
-                          <span className="text-xs font-medium text-zinc-200">
-                            HDFilmcehennemi
-                          </span>
-                          <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
-                        </a>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Durum Yönetimi (Filmlerde sezon seçeneği gizlenir) */}
@@ -803,9 +882,9 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                       key={statusKey}
                       type="button"
                       onClick={() => handleStatusChange(statusKey)}
-                      className={`flex items-center justify-center gap-2 rounded-xl p-3 text-xs font-medium border transition-all text-center ${
+                      className={`flex items-center justify-center gap-2 rounded-xl p-3 text-xs font-medium border transition-colors duration-150 text-center ${
                         isSelected
-                          ? `${conf.badgeStyle} ${conf.borderStyle} font-semibold ring-1 ring-amber-500/30`
+                          ? `${conf.badgeStyle} ${conf.borderStyle} ring-1 ring-amber-500/30`
                           : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
                       }`}
                     >
@@ -822,16 +901,20 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               </div>
             </div>
 
-            {/* Puanlama Sistemi (Sade Başlık) */}
+            {/* Puanlama Sistemi (Sade Başlık ve Sabit Satır Yüksekliği) */}
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 min-h-[22px]">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                   <Sparkles size={13} strokeWidth={1.5} className="text-amber-400" />
                   Puanım
                 </h4>
-                {selectedRating && (
+                {selectedRating ? (
                   <span className="text-xs font-bold text-amber-400">
                     {ABSURD_RATINGS[selectedRating].title}
+                  </span>
+                ) : (
+                  <span className="text-xs text-zinc-600 font-normal">
+                    Puanlanmadı
                   </span>
                 )}
               </div>
@@ -844,7 +927,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                       key={level}
                       type="button"
                       onClick={() => handleRatingSelect(level)}
-                      className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium border transition-all ${
+                      className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium border transition-colors duration-150 ${
                         isSelected
                           ? `${r.bgColor} ${r.badgeColor} ${r.borderColor} ring-1 ring-amber-500/40`
                           : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
