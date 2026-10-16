@@ -273,8 +273,8 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
         setWatchProviders(data.watch_providers || null);
 
-        // TMDB Koleksiyonu kontrolü (eğer bilinen franchise değilse)
-        if (!franchise && data.belongs_to_collection?.id) {
+        // TMDB Koleksiyonu kontrolü (eğer franchise yoksa veya serisi yüklenmediyse)
+        if (data.belongs_to_collection?.id) {
           const colId = data.belongs_to_collection.id;
           const colKey = `collection-${colId}`;
           const colName = data.belongs_to_collection.name;
@@ -386,7 +386,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
       // Mevcut filmi de seri ile eşle
       if (item && colId && !item.tmdb_collection_id) {
-        onUpdate(item.id, {
+        await onUpdate(item.id, {
           tmdb_collection_id: colId,
           collection_name: colName,
         });

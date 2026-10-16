@@ -262,6 +262,51 @@ export const KNOWN_FRANCHISES: FranchiseMeta[] = [
     overview: 'Cem Yılmaz imzalı G.O.R.A, A.R.O.G ve Arif V 216 sinema serisi.',
     movie_tmdb_ids: [13714, 15159, 448341],
   },
+  {
+    id: 'franchise-avatar',
+    tmdb_collection_id: 87096,
+    name: 'Avatar Serisi',
+    poster_path: '/4Jw7HwEZlmirQ40cQhTDtrE5ls4.jpg',
+    backdrop_path: '/4uwX70EzaWVcGUXMtXPoexlNAff.jpg',
+    overview: 'James Cameron imzalı Pandora ve Na’vi efsanesi.',
+    movie_tmdb_ids: [19995, 76600, 83533, 216527, 393209],
+  },
+  {
+    id: 'franchise-dune',
+    tmdb_collection_id: 726871,
+    name: 'Dune Serisi',
+    poster_path: '/c5k0w6z5b4Cek6x6B5uM5fD9r.jpg',
+    backdrop_path: '/xOMo8BRK7PfcJv9JCnx7s520v4q.jpg',
+    overview: 'Denis Villeneuve imzalı Frank Herbert başyapıtı bilim kurgu serisi.',
+    movie_tmdb_ids: [438631, 693134],
+  },
+  {
+    id: 'franchise-gladiator',
+    tmdb_collection_id: 1095147,
+    name: 'Gladyatör Serisi',
+    poster_path: '/8pYkG4P138VbZfBqE429aQvJ7jN.jpg',
+    backdrop_path: '/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
+    overview: 'Ridley Scott imzalı efsanevi Gladyatör serisi.',
+    movie_tmdb_ids: [98, 558449],
+  },
+  {
+    id: 'franchise-top-gun',
+    tmdb_collection_id: 531330,
+    name: 'Top Gun Serisi',
+    poster_path: '/62HCnUTziyWcpDaBO2i1DX17ljH.jpg',
+    backdrop_path: '/AaV1YIdWKnjAiaOe0UUKNJm925R.jpg',
+    overview: 'Pete Maverick Mitchell ve göklerin efsanevi savaş pilotları.',
+    movie_tmdb_ids: [744, 361743],
+  },
+  {
+    id: 'franchise-transformers',
+    tmdb_collection_id: 8650,
+    name: 'Transformers Serisi',
+    poster_path: '/1R9A8r626PqM1jN7xU6Pz00123.jpg',
+    backdrop_path: null,
+    overview: 'Autobotlar ve Decepticonların Dünya üzerindeki savaşı.',
+    movie_tmdb_ids: [1858, 8373, 282035, 91314, 335988, 437670, 667538],
+  },
 ];
 
 // Dinamik seri / koleksiyon kayıt defteri
@@ -417,6 +462,31 @@ export function isMovieInFranchise(movie: MediaItem, franchise: FranchiseMeta): 
       return true;
     }
   }
+  if (franchise.id === 'franchise-avatar') {
+    if (t.includes('avatar')) {
+      return true;
+    }
+  }
+  if (franchise.id === 'franchise-dune') {
+    if (t.includes('dune')) {
+      return true;
+    }
+  }
+  if (franchise.id === 'franchise-gladiator') {
+    if (t.includes('gladyatör') || t.includes('gladiator')) {
+      return true;
+    }
+  }
+  if (franchise.id === 'franchise-top-gun') {
+    if (t.includes('top gun')) {
+      return true;
+    }
+  }
+  if (franchise.id === 'franchise-transformers') {
+    if (t.includes('transformers') || t.includes('bumblebee')) {
+      return true;
+    }
+  }
 
   return false;
 }
@@ -435,6 +505,16 @@ export function getFranchiseForMovie(movie: MediaItem): FranchiseMeta | null {
 // Seride henüz izlenmemiş ilk filmi bulur (Maraton modu "Sıradaki Film")
 export function getNextToWatchInCollection(collection: CollectionGroup): MediaItem | null {
   return collection.items.find(item => item.status === 'watchlist') || null;
+}
+
+export function normalizeBaseTitle(title: string): string {
+  if (!title) return '';
+  return title
+    .replace(/\s*:\s*.*/g, '')
+    .replace(/\s+-\s+.*/g, '')
+    .replace(/\s*\b(1|2|3|4|5|6|7|8|9|10|i|ii|iii|iv|v|vi|vii|viii|ix|x)\b.*$/i, '')
+    .replace(/\s*\(.*\)/g, '')
+    .trim();
 }
 
 /**
@@ -555,48 +635,53 @@ export function groupMediaItemsIntoFeed(
     }
   }
 
-  // 3. Ortak Başlık Ön-Eki Heuristiği (Örn: "Örümcek-Adam: Eve Dönüş", "Örümcek-Adam: Evden Uzakta")
-  const prefixMap = new Map<string, MediaItem[]>();
+
+  // 3. Akıllı Başlık Normalizasyonu ve Seri Eşleme (Universal Smart Title Normalization)
+  // Örn: "Avatar", "Avatar: Suyun Yolu", "Avatar: Ateş ve Kül" -> "Avatar Serisi"
+  // Örn: "Dune", "Dune: Çöl Gezegeni Bölüm İki" -> "Dune Serisi"
+  // Örn: "Top Gun", "Top Gun: Maverick" -> "Top Gun Serisi"
+  // Örn: "Gladyatör", "Gladyatör 2" -> "Gladyatör Serisi"
+  // Örn: "Örümcek-Adam: Eve Dönüş", "Örümcek-Adam: Evden Uzakta" -> "Örümcek-Adam Serisi"
+  const titleGroupMap = new Map<string, MediaItem[]>();
   for (const m of movies) {
     if (!handledItemIds.has(m.id)) {
-      const colonIdx = m.title.indexOf(':');
-      if (colonIdx > 2) {
-        const prefix = m.title.substring(0, colonIdx).trim().toLowerCase();
-        if (prefix.length >= 4) {
-          const list = prefixMap.get(prefix) || [];
-          list.push(m);
-          prefixMap.set(prefix, list);
-        }
+      const base = normalizeBaseTitle(m.title).toLowerCase();
+      if (base.length >= 3) {
+        const list = titleGroupMap.get(base) || [];
+        list.push(m);
+        titleGroupMap.set(base, list);
       }
     }
   }
 
-  for (const [prefix, pMovies] of prefixMap.entries()) {
-    if (pMovies.length >= 2) {
-      pMovies.forEach(m => handledItemIds.add(m.id));
-      const sorted = [...pMovies].sort((a, b) => (parseInt(a.release_year) || 0) - (parseInt(b.release_year) || 0));
-      const watchedCount = pMovies.filter(m => m.status === 'watched').length;
-      const watchlistCount = pMovies.filter(m => m.status === 'watchlist').length;
-      const ratings = pMovies.map(m => m.imdb_rating).filter(r => r > 0);
+  for (const [baseKey, bMovies] of titleGroupMap.entries()) {
+    if (bMovies.length >= 2) {
+      bMovies.forEach(m => handledItemIds.add(m.id));
+      const sorted = [...bMovies].sort((a, b) => (parseInt(a.release_year) || 0) - (parseInt(b.release_year) || 0));
+      const watchedCount = bMovies.filter(m => m.status === 'watched').length;
+      const watchlistCount = bMovies.filter(m => m.status === 'watchlist').length;
+      const ratings = bMovies.map(m => m.imdb_rating).filter(r => r > 0);
       const avgRating = ratings.length > 0
         ? parseFloat((ratings.reduce((acc, r) => acc + r, 0) / ratings.length).toFixed(1))
         : 0;
-      const displayPrefix = pMovies[0].title.split(':')[0].trim();
+
+      const rawBase = normalizeBaseTitle(sorted[0].title);
+      const displayName = rawBase.length > 0 ? rawBase : sorted[0].title.split(':')[0].trim();
 
       result.push({
         type: 'collection',
         collection: {
-          id: `prefix-${prefix.replace(/\s+/g, '-')}`,
-          tmdb_collection_id: pMovies[0].tmdb_collection_id || null,
-          name: `${displayPrefix} Serisi`,
-          poster_path: pMovies[0].poster_path,
-          backdrop_path: pMovies[0].backdrop_path,
+          id: `title-${baseKey.replace(/[^a-z0-9]/g, '-')}`,
+          tmdb_collection_id: sorted.find(m => m.tmdb_collection_id)?.tmdb_collection_id || null,
+          name: `${displayName} Serisi`,
+          poster_path: sorted[0].poster_path,
+          backdrop_path: sorted[0].backdrop_path,
           overview: null,
           items: sorted,
-          total_count: pMovies.length,
+          total_count: bMovies.length,
           watched_count: watchedCount,
           watchlist_count: watchlistCount,
-          completion_percentage: Math.round((watchedCount / pMovies.length) * 100),
+          completion_percentage: Math.round((watchedCount / bMovies.length) * 100),
           average_rating: avgRating,
           latest_release_year: sorted[sorted.length - 1]?.release_year || '',
         },

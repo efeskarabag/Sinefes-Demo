@@ -26,13 +26,24 @@ export async function getMediaItems(): Promise<MediaItem[]> {
   return INITIAL_DEMO_ITEMS;
 }
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
  * Oturum hafızasına yeni film veya dizi ekler.
  */
 export async function saveMediaItem(item: Omit<MediaItem, 'id' | 'created_at'>): Promise<MediaItem> {
   const newItem: MediaItem = {
     ...item,
-    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}`,
+    id: generateUUID(),
     created_at: new Date().toISOString(),
   };
 
@@ -55,11 +66,9 @@ export async function saveMediaItem(item: Omit<MediaItem, 'id' | 'created_at'>):
 export async function saveMultipleMediaItems(
   items: Array<Omit<MediaItem, 'id' | 'created_at'>>
 ): Promise<MediaItem[]> {
-  const newItems: MediaItem[] = items.map((item, index) => ({
+  const newItems: MediaItem[] = items.map(item => ({
     ...item,
-    id: typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `item-${Date.now()}-${index}`,
+    id: generateUUID(),
     created_at: new Date().toISOString(),
   }));
 

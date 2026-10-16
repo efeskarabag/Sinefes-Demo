@@ -173,7 +173,9 @@ export const INITIAL_DEMO_ITEMS: MediaItem[] = [
     genres: "Bilim Kurgu, Macera, Aksiyon",
     duration: "166 dk",
     total_seasons: null,
-    created_at: "2024-03-01T12:00:00.000Z"
+    created_at: "2024-03-01T12:00:00.000Z",
+    tmdb_collection_id: 726871,
+    collection_name: "Dune Serisi"
   },
   {
     id: "demo-movie-2",

@@ -182,6 +182,7 @@ export async function GET(request: Request) {
 
 function getTmdbIdForFranchise(franchiseId: string): number | null {
   const map: Record<string, number> = {
+    'franchise-spiderman': 531241,
     'franchise-bad-boys': 14890,
     'franchise-never-back-down': 96676,
     'franchise-kardes-takimi': 1294316,
@@ -189,6 +190,27 @@ function getTmdbIdForFranchise(franchiseId: string): number | null {
     'franchise-harry-potter': 1241,
     'franchise-dark-knight': 263,
     'franchise-john-wick': 404609,
+    'franchise-fast-furious': 9485,
+    'franchise-matrix': 2344,
+    'franchise-star-wars': 10,
+    'franchise-pirates': 295,
+    'franchise-mission-impossible': 87359,
+    'franchise-hunger-games': 131635,
+    'franchise-twilight': 33514,
+    'franchise-shrek': 12248,
+    'franchise-ice-age': 8354,
+    'franchise-avengers': 86311,
+    'franchise-kolpacino': 1134260,
+    'franchise-recep-ivedik': 373289,
+    'franchise-cakallarla-dans': 373291,
+    'franchise-hababam-sinifi': 97893,
+    'franchise-organize-isler': 579737,
+    'franchise-gora-arog': 472506,
+    'franchise-avatar': 87096,
+    'franchise-dune': 726871,
+    'franchise-gladiator': 1095147,
+    'franchise-top-gun': 531330,
+    'franchise-transformers': 8650,
   };
   return map[franchiseId] || null;
 }
