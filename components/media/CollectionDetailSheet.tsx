@@ -19,7 +19,7 @@ import {
 import { CollectionGroup, MediaItem } from '@/lib/types';
 import { ABSURD_RATINGS } from '@/lib/constants';
 import { RatingIcon, SeriesIcon } from '@/components/media/MediaIcons';
-import { getNextToWatchInCollection } from '@/lib/collections';
+import { getNextToWatchInCollection, getFranchiseForMovie } from '@/lib/collections';
 import { useAuth } from '@/lib/authContext';
 
 interface CollectionPart {
@@ -129,9 +129,24 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
 
     setIsLoadingParts(true);
 
-    const queryParam = collection.id.startsWith('franchise-')
-      ? `franchiseId=${encodeURIComponent(collection.id)}`
-      : `id=${collection.tmdb_collection_id || ''}`;
+    let queryParam = '';
+    if (collection.id.startsWith('franchise-')) {
+      queryParam = `franchiseId=${encodeURIComponent(collection.id)}`;
+    } else if (collection.tmdb_collection_id) {
+      queryParam = `id=${collection.tmdb_collection_id}`;
+    } else if (collection.items.length > 0) {
+      const f = getFranchiseForMovie(collection.items[0]);
+      if (f) {
+        queryParam = f.tmdb_collection_id
+          ? `id=${f.tmdb_collection_id}`
+          : `franchiseId=${encodeURIComponent(f.id)}`;
+      }
+    }
+
+    if (!queryParam) {
+      setIsLoadingParts(false);
+      return;
+    }
 
     fetch(`/api/tmdb/collection?${queryParam}`)
       .then(res => (res.ok ? res.json() : null))

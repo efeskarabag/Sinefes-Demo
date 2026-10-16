@@ -27,57 +27,7 @@ import { useAuth } from '@/lib/authContext';
 import { StatusIcon, RatingIcon, SeriesIcon } from '@/components/media/MediaIcons';
 import { getFranchiseForMovie, registerDynamicCollection } from '@/lib/collections';
 
-// Platform doğrudan uygulama (Universal Link) veya resmi web arama URL'i üretici
-export const getPlatformUrl = (platformName: string, title: string): string => {
-  const p = platformName.toLowerCase();
-  const q = encodeURIComponent(title);
 
-  if (p.includes('netflix')) {
-    return `https://www.netflix.com/search?q=${q}`;
-  }
-  if (p.includes('disney')) {
-    return `https://www.disneyplus.com/search?q=${q}`;
-  }
-  if (p.includes('prime') || p.includes('amazon')) {
-    return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
-  }
-  if (p.includes('apple') || p.includes('tv+')) {
-    if (p.includes('apple')) {
-      return `https://tv.apple.com/search?term=${q}`;
-    }
-    // Turkcell TV+
-    return `https://tvplus.com.tr/arama?q=${q}`;
-  }
-  if (p.includes('blu')) {
-    return `https://www.blutv.com/arama?q=${q}`;
-  }
-  if (p.includes('gain') || p.includes('gaın')) {
-    return `https://www.gain.tv/arama?q=${q}`;
-  }
-  if (p.includes('exxen')) {
-    return `https://www.exxen.com/tr/arama?q=${q}`;
-  }
-  if (p.includes('max') || p.includes('hbo')) {
-    return `https://www.max.com/search?q=${q}`;
-  }
-  if (p.includes('tod') || p.includes('bein')) {
-    return `https://www.todtv.com.tr/arama?q=${q}`;
-  }
-  if (p.includes('mubi')) {
-    return `https://mubi.com/tr/search/films?query=${q}`;
-  }
-  if (p.includes('dsmart') || p.includes('d-smart')) {
-    return `https://www.dsmartgo.com.tr/arama?q=${q}`;
-  }
-  if (p.includes('tivibu')) {
-    return `https://www.tivibu.com.tr/arama?q=${q}`;
-  }
-  if (p.includes('hdfilm')) {
-    return `https://www.google.com/search?q=${encodeURIComponent(`hdfilmcehennemi ${title}`)}`;
-  }
-
-  return `https://www.google.com/search?q=${encodeURIComponent(`${platformName} ${title}`)}`;
-};
 
 interface SeriesPartItem {
   id: number;
@@ -811,38 +761,34 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
               </div>
             )}
 
-            {/* Nerede İzlenir? (Platformlar & HDFilmcehennemi) */}
+            {/* Nerede İzlenir? (Platformlar & Google Arama) */}
             <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                   <PlayCircle size={14} strokeWidth={1.75} className="text-amber-400" />
                   Nerede İzlenir?
                 </h4>
-                <div className="flex items-center gap-2.5">
-                  <a
-                    href={`https://www.google.com/search?q=${encodeURIComponent(item.title + ' izle nerede izlenir')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition"
-                  >
-                    <Search size={10} strokeWidth={1.5} />
-                    <span>Google</span>
-                  </a>
-                  {watchProviders?.link && (
-                    <a
-                      href={watchProviders.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-0.5 transition"
-                    >
-                      <span>TMDB</span>
-                      <ExternalLink size={9} strokeWidth={1.5} />
-                    </a>
-                  )}
-                </div>
+                <a
+                  href={`https://www.google.com/search?q=${encodeURIComponent(`${item.title} izle nerede izlenir`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer external"
+                  onClick={(e) => {
+                    const url = `https://www.google.com/search?q=${encodeURIComponent(`${item.title} izle nerede izlenir`)}`;
+                    if (typeof window !== 'undefined' && (window.navigator as unknown as { standalone?: boolean }).standalone) {
+                      e.preventDefault();
+                      window.open(url, '_blank');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-750 bg-zinc-800/80 hover:bg-zinc-800 hover:border-amber-500/50 hover:text-amber-300 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition-colors shadow-sm active:opacity-85"
+                  title={`${item.title} için Google'da ara`}
+                >
+                  <Search size={11} strokeWidth={2} className="text-amber-400" />
+                  <span>Google</span>
+                  <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500" />
+                </a>
               </div>
 
-              {/* Platform Listesi — Sabit min-h-[38px] ve asla sıfırlanmayan platform yapısı */}
+              {/* Platform Listesi — Tamamen inaktif, sadece nerede olduğunu gösterir */}
               <div className="min-h-[38px] flex items-center">
                 {isLoadingDetails && !watchProviders ? (
                   <div className="flex items-center gap-2 w-full py-1">
@@ -850,8 +796,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                     <div className="h-8 w-32 rounded-xl bg-zinc-850/60 animate-pulse border border-zinc-800/40" />
                   </div>
                 ) : (
-                  <div className="w-full space-y-2">
-                    {/* Tüm Platformlar (Netflix, Disney+, Prime, BluTV & HDFilmcehennemi) */}
+                  <div className="w-full">
                     {(() => {
                       const official = [
                         ...(watchProviders?.flatrate || []),
@@ -861,16 +806,21 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                         new Map(official.map(p => [p.provider_id, p])).values()
                       );
 
+                      if (unique.length === 0) {
+                        return (
+                          <div className="flex items-center gap-2 text-xs text-zinc-400 py-1">
+                            <Tv size={14} className="text-zinc-500 flex-shrink-0" />
+                            <span>Türkiye&apos;de şu an dijital platformlarda bulunmuyor.</span>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div className="flex flex-wrap items-center gap-2">
                           {unique.map(p => (
-                            <a
+                            <div
                               key={p.provider_id}
-                              href={getPlatformUrl(p.provider_name, item.title)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition-colors duration-150 active:opacity-80 group"
-                              title={`${p.provider_name}'de aç`}
+                              className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 px-2.5 py-1.5 shadow-sm select-none cursor-default"
                             >
                               {p.logo_path ? (
                                 <Image
@@ -888,26 +838,8 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                               <span className="text-xs font-medium text-zinc-200">
                                 {p.provider_name}
                               </span>
-                              <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
-                            </a>
-                          ))}
-
-                          {/* HDFilmcehennemi — Standart Eşit Bir Platform Kartı Olarak */}
-                          <a
-                            href={getPlatformUrl('hdfilmcehennemi', item.title)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 hover:bg-zinc-900/90 hover:border-zinc-700 px-2.5 py-1.5 shadow-sm transition-colors duration-150 active:opacity-80 group"
-                            title="HDFilmcehennemi'nde ara / izle"
-                          >
-                            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/15 text-amber-400 flex-shrink-0">
-                              <Film size={12} strokeWidth={1.75} />
                             </div>
-                            <span className="text-xs font-medium text-zinc-200">
-                              HDFilmcehennemi
-                            </span>
-                            <ExternalLink size={10} strokeWidth={1.5} className="text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
-                          </a>
+                          ))}
                         </div>
                       );
                     })()}
