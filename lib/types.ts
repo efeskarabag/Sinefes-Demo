@@ -38,6 +38,8 @@ export interface MediaItem {
   duration?: string | null;        // Örn: "118 dk"
   total_seasons?: number | null;   // Örn: 3
   created_at: string;
+  tmdb_collection_id?: number | null;
+  collection_name?: string | null;
 }
 
 export interface TMDBMediaResult {

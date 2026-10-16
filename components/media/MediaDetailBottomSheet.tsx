@@ -25,7 +25,7 @@ import { MediaItem, MediaStatus, CustomRating, WatchProvider } from '@/lib/types
 import { ABSURD_RATINGS, STATUS_CONFIG } from '@/lib/constants';
 import { useAuth } from '@/lib/authContext';
 import { StatusIcon, RatingIcon, SeriesIcon } from '@/components/media/MediaIcons';
-import { getFranchiseForMovie } from '@/lib/collections';
+import { getFranchiseForMovie, registerDynamicCollection } from '@/lib/collections';
 
 // Platform doğrudan uygulama (Universal Link) veya resmi web arama URL'i üretici
 export const getPlatformUrl = (platformName: string, title: string): string => {
@@ -275,16 +275,38 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
 
         // TMDB Koleksiyonu kontrolü (eğer bilinen franchise değilse)
         if (!franchise && data.belongs_to_collection?.id) {
-          const colKey = `collection-${data.belongs_to_collection.id}`;
+          const colId = data.belongs_to_collection.id;
+          const colKey = `collection-${colId}`;
+          const colName = data.belongs_to_collection.name;
+
           if (seriesCache.has(colKey)) {
-            setSeriesInfo(seriesCache.get(colKey)!);
+            const sData = seriesCache.get(colKey)!;
+            setSeriesInfo(sData);
+            registerDynamicCollection({
+              id: colKey,
+              tmdb_collection_id: colId,
+              name: sData.name || colName,
+              poster_path: sData.parts?.[0]?.poster_path || null,
+              backdrop_path: sData.parts?.[0]?.backdrop_path || null,
+              overview: sData.overview || undefined,
+              movie_tmdb_ids: (sData.parts || []).map((p: SeriesPartItem) => p.id),
+            });
           } else {
-            fetch(`/api/tmdb/collection?id=${data.belongs_to_collection.id}`)
+            fetch(`/api/tmdb/collection?id=${colId}`)
               .then(res => (res.ok ? res.json() : null))
               .then(sData => {
                 if (!isMounted || !sData) return;
                 seriesCache.set(colKey, sData);
                 setSeriesInfo(sData);
+                registerDynamicCollection({
+                  id: colKey,
+                  tmdb_collection_id: colId,
+                  name: sData.name || colName,
+                  poster_path: sData.parts?.[0]?.poster_path || null,
+                  backdrop_path: sData.parts?.[0]?.backdrop_path || null,
+                  overview: sData.overview || undefined,
+                  movie_tmdb_ids: (sData.parts || []).map((p: SeriesPartItem) => p.id),
+                });
               })
               .catch(err => console.warn('Failed to fetch collection info:', err));
           }
@@ -340,6 +362,9 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
     if (missingParts.length === 0) return;
     setIsAddingSeries(true);
     try {
+      const colId = seriesInfo?.id;
+      const colName = seriesInfo?.name || 'Seri';
+
       const itemsToAdd = missingParts.map(p => ({
         tmdb_id: p.id,
         title: p.title,
@@ -355,8 +380,32 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
         genres: item?.genres || null,
         duration: null,
         total_seasons: null,
+        tmdb_collection_id: colId || null,
+        collection_name: colName,
       }));
-      await onAddMultiple(itemsToAdd, seriesInfo?.name || 'Seri');
+
+      // Mevcut filmi de seri ile eşle
+      if (item && colId && !item.tmdb_collection_id) {
+        onUpdate(item.id, {
+          tmdb_collection_id: colId,
+          collection_name: colName,
+        });
+      }
+
+      // Dinamik koleksiyon kaydı oluştur
+      if (seriesInfo) {
+        registerDynamicCollection({
+          id: `collection-${seriesInfo.id}`,
+          tmdb_collection_id: seriesInfo.id,
+          name: colName,
+          poster_path: seriesInfo.parts[0]?.poster_path || item?.poster_path || null,
+          backdrop_path: seriesInfo.parts[0]?.backdrop_path || item?.backdrop_path || null,
+          overview: seriesInfo.overview || undefined,
+          movie_tmdb_ids: seriesInfo.parts.map(p => p.id),
+        });
+      }
+
+      await onAddMultiple(itemsToAdd, colName);
     } catch (err) {
       console.error('Failed to add series items:', err);
     } finally {
@@ -596,6 +645,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                 src={backdropUrl}
                 alt={item.title}
                 fill
+                sizes="(max-width: 768px) 100vw, 576px"
                 className="object-cover opacity-50"
                 onError={() => setBackdropError(true)}
               />
@@ -604,6 +654,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                 src={posterUrl}
                 alt={item.title}
                 fill
+                sizes="(max-width: 768px) 100vw, 576px"
                 className="object-cover blur-sm opacity-30"
               />
             ) : null}
@@ -618,6 +669,7 @@ export const MediaDetailBottomSheet: React.FC<MediaDetailBottomSheetProps> = ({
                     src={posterUrl}
                     alt={item.title}
                     fill
+                    sizes="80px"
                     className="object-cover"
                     onError={() => setImgError(true)}
                   />

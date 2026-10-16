@@ -112,7 +112,9 @@ export const INITIAL_DEMO_ITEMS: MediaItem[] = [
     genres: "Aksiyon, Suç, Dram",
     duration: "140 dk",
     total_seasons: null,
-    created_at: "2024-02-19T12:00:00.000Z"
+    created_at: "2024-02-19T12:00:00.000Z",
+    tmdb_collection_id: 263,
+    collection_name: "Kara Şövalye Üçlemesi"
   },
   {
     id: "demo-movie-hp-1",
@@ -130,7 +132,9 @@ export const INITIAL_DEMO_ITEMS: MediaItem[] = [
     genres: "Macera, Fantastik",
     duration: "152 dk",
     total_seasons: null,
-    created_at: "2024-02-17T12:00:00.000Z"
+    created_at: "2024-02-17T12:00:00.000Z",
+    tmdb_collection_id: 1241,
+    collection_name: "Harry Potter Serisi"
   },
   {
     id: "demo-movie-hp-3",
@@ -148,7 +152,9 @@ export const INITIAL_DEMO_ITEMS: MediaItem[] = [
     genres: "Macera, Fantastik",
     duration: "142 dk",
     total_seasons: null,
-    created_at: "2024-02-16T12:00:00.000Z"
+    created_at: "2024-02-16T12:00:00.000Z",
+    tmdb_collection_id: 1241,
+    collection_name: "Harry Potter Serisi"
   }
 ,
   {
@@ -221,7 +227,9 @@ export const INITIAL_DEMO_ITEMS: MediaItem[] = [
     genres: "Aksiyon, Suç, Dram",
     duration: "152 dk",
     total_seasons: null,
-    created_at: "2024-02-20T12:00:00.000Z"
+    created_at: "2024-02-20T12:00:00.000Z",
+    tmdb_collection_id: 263,
+    collection_name: "Kara Şövalye Üçlemesi"
   },
   {
     id: "demo-movie-5",

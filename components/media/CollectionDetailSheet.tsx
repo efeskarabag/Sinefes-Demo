@@ -248,6 +248,8 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
         genres: null,
         duration: null,
         total_seasons: null,
+        tmdb_collection_id: collection.tmdb_collection_id || null,
+        collection_name: collection.name,
       }));
       await onAddMultiple(itemsToAdd, collection.name);
     } catch (err) {
@@ -280,6 +282,8 @@ export const CollectionDetailSheet: React.FC<CollectionDetailSheetProps> = ({
         genres: null,
         duration: null,
         total_seasons: null,
+        tmdb_collection_id: collection?.tmdb_collection_id || null,
+        collection_name: collection?.name || null,
       });
     } catch (err) {
       console.error('Failed to add single item:', err);

@@ -1,7 +1,7 @@
 import { INITIAL_DEMO_ITEMS } from './constants';
 import { MediaItem } from './types';
 
-const STORAGE_KEY = 'sinefes_demo_media_items_v3';
+const STORAGE_KEY = 'sinefes_demo_media_items_v4';
 
 /**
  * Oturuma özel medya listesini getirir.

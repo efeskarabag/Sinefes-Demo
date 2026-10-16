@@ -118,7 +118,10 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
         ? result.number_of_seasons || null
         : null;
 
-    // TMDB Detay Servisinden Gerçek Sezon Sayısı ve Süreyi Çek
+    let tmdbCollectionId: number | null = null;
+    let collectionName: string | null = null;
+
+    // TMDB Detay Servisinden Gerçek Sezon Sayısı, Süre ve Koleksiyon Bilgisini Çek
     try {
       const detailsRes = await fetch(`/api/tmdb/details?id=${result.id}&type=${mediaType}`);
       if (detailsRes.ok) {
@@ -127,6 +130,10 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
           totalSeasons = detailsData.number_of_seasons;
         } else if (mediaType === 'movie' && detailsData.runtime) {
           duration = `${detailsData.runtime} dk`;
+        }
+        if (mediaType === 'movie' && detailsData.belongs_to_collection) {
+          tmdbCollectionId = detailsData.belongs_to_collection.id;
+          collectionName = detailsData.belongs_to_collection.name;
         }
       }
     } catch (err) {
@@ -152,6 +159,8 @@ export const SearchSheet: React.FC<SearchSheetProps> = ({
       genres: genresString,
       duration,
       total_seasons: totalSeasons,
+      tmdb_collection_id: tmdbCollectionId,
+      collection_name: collectionName,
     });
 
     setAddedIds(prev => new Set(prev).add(result.id));
